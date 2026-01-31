@@ -233,10 +233,9 @@ let handler = async (m, { conn, usedPrefix }) => {
         ╰┈➤ Cerrar sesión del bot  
 ╰┈➤ 🖼️ *#setpfp / #setimage*
         ╰┈➤ Cambiar la imagen de perfil  
-╰┈➤ 📝 *#setstatus* + [estado]
-        ╰┈➤ Cambiar el estado del bot  
-╰┈➤ 🆔 *#setusername* + [nombre]
-        ╰┈➤ Cambiar el nombre de usuario  
+╰┈➤ 🖍️ *#config*
+        ╰┈➤ Configura tu bot a tu gusto como a ti te guste  
+
 
 ┏━━━━━━━━━━━━━━┓
 *🛠️ UTILITIES*  
