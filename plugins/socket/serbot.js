@@ -5,7 +5,6 @@ import fs from "fs"
 import path from "path"
 import pino from 'pino'
 import chalk from 'chalk'
-import util from 'util'
 import * as ws from 'ws'
 const { child, spawn, exec } = await import('child_process')
 const { CONNECTING } = ws
@@ -62,17 +61,14 @@ if (!global.subBotsData) global.subBotsData = new Map()
 // ============= FUNCIÓN PARA VERIFICAR CONEXIÓN =============
 function isSubBotConnected(jid) { 
     if (!global.conns || !Array.isArray(global.conns)) return false
-
     const targetJid = jid.split("@")[0]
-
     return global.conns.some(sock => {
         try {
             if (!sock || !sock.user || !sock.user.jid) return false
             if (sock.user.jid.split("@")[0] === targetJid) {
-                // Verificar estado de conexión
                 if (sock.ws) {
                     const state = sock.ws.readyState
-                    return state === 1 || state === 0 // OPEN o CONNECTING
+                    return state === 1 || state === 0
                 }
                 return true
             }
@@ -90,30 +86,26 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
         return m.reply(`ꕥ El Comando *${command}* está desactivado temporalmente.`)
     }
 
-    // ============ VERIFICAR LÍMITE (CORREGIDO) ============
+    // ============ VERIFICAR LÍMITE ============
     let activeSubBotsCount = 0
-
     if (global.conns && Array.isArray(global.conns)) {
-        // Contar solo SubBots con conexión activa
         activeSubBotsCount = global.conns.filter(sock => {
             try {
                 return sock && 
                        sock.user && 
                        sock.user.jid && 
-                       sock.user.jid !== global.conn.user.jid && // No es bot principal
+                       sock.user.jid !== global.conn.user.jid &&
                        sock.ws && 
-                       (sock.ws.readyState === 1 || sock.ws.readyState === 0) // OPEN o CONNECTING
+                       (sock.ws.readyState === 1 || sock.ws.readyState === 0)
             } catch (e) {
                 return false
             }
         }).length
     }
 
-    console.log(chalk.cyan(`[SUBBOT DEBUG] Activos: ${activeSubBotsCount}, Total en array: ${global.conns?.length || 0}`))
+    console.log(chalk.cyan(`[SUBBOT DEBUG] Activos: ${activeSubBotsCount}`))
 
     const maxLimit = global.supConfig?.maxSubBots || 100
-
-    // Solo mostrar advertencia si realmente hay muchos activos
     if (activeSubBotsCount >= maxLimit) {
         return m.reply(
             `⚠️ *LÍMITE DE SUBBOTS ALCANZADO*\n\n` +
@@ -124,9 +116,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
         )
     }
 
-    // ============ COOLDOWN ============
+    // ============ COOLDOWN RÁPIDO ============
     const userCooldown = global.db.data.users[m.sender]?.Subs || 0
-    const timeLeft = 120000 - (Date.now() - userCooldown)
+    const timeLeft = 60000 - (Date.now() - userCooldown) // Reducido a 1 minuto
 
     if (timeLeft > 0) {
         return m.reply(`ꕥ Debes esperar ${msToTime(timeLeft)} para volver a vincular un *Sub-Bot.*`)
@@ -137,32 +129,28 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     let who = mentionedJid && mentionedJid[0] ? mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
     let id = `${who.split`@`[0]}`
 
-    // Verificar si ya existe una sesión activa
     if (isSubBotConnected(who)) {
         return m.reply(
             `⚠️ Ya tienes un SubBot activo para este número.\n\n` +
             `📋 *Opciones:*\n` +
             `• *${usedPrefix}kill ${id}* - Eliminar este SubBot\n` +
             `• *${usedPrefix}listjadibot* - Ver todos los SubBots\n` +
-            `• Espera 2 minutos para crear uno nuevo`
+            `• Espera 1 minuto para crear uno nuevo`
         )
     }
 
     let pathAstaJadiBot = path.join(`./${global.jadi || 'Sessions/SubBot'}/`, id)
 
-    // Limpiar sesión anterior si existe
+    // Limpiar sesión anterior RÁPIDO
     if (fs.existsSync(pathAstaJadiBot)) {
         try {
             fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
             console.log(chalk.yellow(`🗑️ Sesión anterior limpiada: ${id}`))
-        } catch (e) {
-            console.error('Error limpiando sesión anterior:', e)
-        }
+        } catch (e) {}
     }
 
     if (!fs.existsSync(pathAstaJadiBot)) {
         fs.mkdirSync(pathAstaJadiBot, { recursive: true })
-        console.log(chalk.green(`📁 Carpeta creada: ${pathAstaJadiBot}`))
     }
 
     AstaJBOptions.pathAstaJadiBot = pathAstaJadiBot
@@ -174,8 +162,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     AstaJBOptions.fromCommand = true
     AstaJBOptions.userId = id
 
-    console.log(chalk.blue(`🚀 Creando SubBot para: ${id}`))
-
+    console.log(chalk.blue(`🚀 Creando SubBot RÁPIDO para: ${id}`))
+    
+    // INICIAR INMEDIATAMENTE sin esperar
     AstaJadiBot(AstaJBOptions)
     global.db.data.users[m.sender].Subs = Date.now()
 }
@@ -185,7 +174,7 @@ handler.tags = ['serbot']
 handler.command = ['qr', 'code']
 export default handler 
 
-// ============= FUNCIÓN PRINCIPAL PARA CREAR SUBBOT =============
+// ============= FUNCIÓN OPTIMIZADA PARA CREAR SUBBOT RÁPIDO =============
 export async function AstaJadiBot(options) {
     let { pathAstaJadiBot, m, conn, args, usedPrefix, command, userId } = options
 
@@ -213,309 +202,172 @@ export async function AstaJadiBot(options) {
         if (args[0] && args[0] != undefined) {
             const credsData = JSON.parse(Buffer.from(args[0], "base64").toString("utf-8"))
             fs.writeFileSync(pathCreds, JSON.stringify(credsData, null, '\t'))
-            console.log(chalk.green('✅ Credenciales guardadas desde argumento'))
         }
     } catch {
         await conn.reply(m.chat, `ꕥ Use correctamente el comando » ${usedPrefix + command}`, m)
         return
     }
 
-    const comb = Buffer.from(crm1 + crm2 + crm3 + crm4, "base64")
-    exec(comb.toString("utf-8"), async (err, stdout, stderr) => {
-        if (err) {
-            console.error('Error ejecutando comando:', err)
+    // ============= CONFIGURACIÓN ULTRA RÁPIDA =============
+    const { version } = await fetchLatestBaileysVersion()
+    
+    const msgRetryCache = new NodeCache()
+    const { state, saveCreds } = await useMultiFileAuthState(pathAstaJadiBot)
+
+    const connectionOptions = {
+        logger: pino({ level: "silent" }),
+        printQRInTerminal: false,
+        auth: { 
+            creds: state.creds, 
+            keys: makeCacheableSignalKeyStore(state.keys, pino({level: 'silent'})) 
+        },
+        msgRetry: () => {},
+        msgRetryCache, 
+        browser: ['Chrome (Linux)', '', ''],
+        version: version,
+        generateHighQualityLinkPreview: true,
+        syncFullHistory: false,
+        fireInitQueries: true,
+        emitOwnEvents: false,
+        defaultQueryTimeoutMs: 10000,
+        connectTimeoutMs: 10000,
+        keepAliveIntervalMs: 10000,
+        maxIdleTimeMs: 15000
+    }
+
+    let sock = makeWASocket(connectionOptions)
+    sock.isInit = false
+    let isInit = true
+
+    // ============= CONFIGURACIÓN MINIMALISTA =============
+    const defaultConfig = {
+        name: `SubBot-${userId}`,
+        prefix: global.prefix.toString(),
+        sinprefix: false,
+        mode: 'public',
+        owner: m.sender,
+        createdAt: new Date().toISOString()
+    }
+
+    sock.subConfig = defaultConfig
+
+    // ============= GESTIÓN DE SESIONES RÁPIDA =============
+    const saveSubBotState = async () => {
+        try {
+            if (!sock.user || !sock.user.jid) return
+            const sessionId = sock.user.jid.split('@')[0]
+            const state = {
+                jid: sock.user.jid,
+                name: sock.user.name || sock.subConfig?.name,
+                config: sock.subConfig || defaultConfig,
+                lastConnected: new Date().toISOString()
+            }
+
+            if (global.subBotsData) {
+                global.subBotsData.set(sessionId, state)
+            }
+        } catch (error) {}
+    }
+
+    // ============= TIMEOUT ACORTADO =============
+    setTimeout(async () => {
+        if (!sock.user) {
+            try { 
+                if (fs.existsSync(pathAstaJadiBot)) {
+                    fs.rmSync(pathAstaJadiBot, { recursive: true, force: true }) 
+                }
+            } catch {}
+            try { sock.ws?.close() } catch {}
+            sock.ev.removeAllListeners()
+
+            if (global.conns && Array.isArray(global.conns)) {
+                const index = global.conns.indexOf(sock)
+                if (index >= 0) {
+                    global.conns.splice(index, 1)
+                }
+            }
         }
+    }, 30000) // Reducido a 30 segundos
 
-        const drmer = Buffer.from(drm1 + drm2, `base64`)
-        let { version, isLatest } = await fetchLatestBaileysVersion()
+    // ============= CONNECTION UPDATE OPTIMIZADO =============
+    async function connectionUpdate(update) {
+        const { connection, lastDisconnect, isNewLogin, qr } = update
 
-        const msgRetry = (MessageRetryMap) => { }
-        const msgRetryCache = new NodeCache()
-        const { state, saveState, saveCreds } = await useMultiFileAuthState(pathAstaJadiBot)
+        if (isNewLogin) sock.isInit = false
 
-        const connectionOptions = {
-            logger: pino({ level: "fatal" }),
-            printQRInTerminal: false,
-            auth: { 
-                creds: state.creds, 
-                keys: makeCacheableSignalKeyStore(state.keys, pino({level: 'silent'})) 
-            },
-            msgRetry,
-            msgRetryCache, 
-            browser: ['Windows', 'Firefox'],
-            version: version,
-            generateHighQualityLinkPreview: true
-        }
-
-        let sock = makeWASocket(connectionOptions)
-        sock.isInit = false
-        let isInit = true
-
-        // ============= CONFIGURACIÓN INICIAL DEL SUBBOT =============
-        const defaultConfig = {
-            name: `SubBot-${userId}`,
-            prefix: global.prefix.toString(),
-            sinprefix: false,
-            mode: 'public',
-            antiPrivate: false,
-            gponly: false,
-            owner: m.sender,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            autoReconnect: global.supConfig?.autoRestart || true,
-            sessionTime: global.supConfig?.sessionTime || 60
-        }
-
-        const configPath = path.join(pathAstaJadiBot, 'config.json')
-        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2))
-        sock.subConfig = defaultConfig
-
-        // Crear archivo de estado
-        const statePath = path.join(pathAstaJadiBot, 'state.json')
-        const initialState = {
-            jid: '',
-            name: '',
-            config: defaultConfig,
-            lastConnected: new Date().toISOString(),
-            createdAt: new Date().toISOString()
-        }
-        fs.writeFileSync(statePath, JSON.stringify(initialState, null, 2))
-
-        // ============= GESTIÓN DE SESIONES =============
-        const saveSubBotState = async () => {
+        // GENERAR QR INMEDIATAMENTE (2-3 segundos)
+        if (qr && !mcode) {
             try {
-                if (!sock.user || !sock.user.jid) return
+                // Generar QR de forma asíncrona sin bloquear
+                qrcode.toBuffer(qr, { scale: 6 }, async (err, buffer) => {
+                    if (err) return
+                    
+                    if (m?.chat) {
+                        txtQR = await conn.sendMessage(m.chat, { 
+                            image: buffer, 
+                            caption: rtx.trim()
+                        }, { quoted: m })
 
-                const sessionId = sock.user.jid.split('@')[0]
-                const state = {
-                    jid: sock.user.jid,
-                    name: sock.user.name || sock.subConfig?.name,
-                    config: sock.subConfig || defaultConfig,
-                    authState: {
-                        me: sock.authState?.creds?.me,
-                        deviceId: sock.authState?.creds?.deviceId,
-                        registered: sock.authState?.creds?.registered
-                    },
-                    lastConnected: new Date().toISOString(),
-                    version: global.vs || '1.4'
-                }
-
-                fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
-
-                if (global.subBotsData) {
-                    global.subBotsData.set(sessionId, state)
-                }
-
-            } catch (error) {
-                console.error(chalk.red('❌ Error guardando estado:', error))
-            }
-        }
-
-        // ============= LIMPIEZA AUTOMÁTICA =============
-        setTimeout(async () => {
-            if (!sock.user) {
-                console.log(chalk.yellow(`⏰ Limpiando SubBot sin usuario: ${userId}`))
-                try { 
-                    if (fs.existsSync(pathAstaJadiBot)) {
-                        fs.rmSync(pathAstaJadiBot, { recursive: true, force: true }) 
+                        // Enviar imagen de bot en paralelo
+                        conn.sendMessage(m.chat, {
+                            image: { url: imagenSerBot },
+                            caption: '🤖 *Sub-Bot de Asta*\n\n¡Escanea el QR de arriba! ⬆️'
+                        }, { quoted: m }).catch(() => {})
                     }
-                } catch {}
-                try { sock.ws?.close() } catch {}
-                sock.ev.removeAllListeners()
 
-                // Eliminar de global.conns
-                if (global.conns && Array.isArray(global.conns)) {
-                    const index = global.conns.indexOf(sock)
-                    if (index >= 0) {
-                        global.conns.splice(index, 1)
-                        console.log(chalk.green(`✅ SubBot eliminado de lista: ${userId}`))
+                    if (txtQR && txtQR.key) {
+                        setTimeout(() => { 
+                            conn.sendMessage(m.sender, { delete: txtQR.key }).catch(() => {})
+                        }, 45000)
                     }
-                }
-            }
-        }, 60000)
+                })
+            } catch (e) {}
+            return
+        } 
 
-        // ============= GESTIÓN DE CONEXIÓN =============
-        async function connectionUpdate(update) {
-            const { connection, lastDisconnect, isNewLogin, qr } = update
+        // GENERAR CÓDIGO DE PAIRING RÁPIDO
+        if (qr && mcode) {
+            try {
+                let secret = await sock.requestPairingCode((m.sender.split`@`[0]))
+                secret = secret.match(/.{1,4}/g)?.join("-")
 
-            if (isNewLogin) sock.isInit = false
-
-            // Mostrar QR si está disponible
-            if (qr && !mcode) {
-                if (m?.chat) {
-                    txtQR = await conn.sendMessage(m.chat, { 
-                        image: await qrcode.toBuffer(qr, { scale: 8 }), 
-                        caption: rtx.trim()
-                    }, { quoted: m })
-
-                    await conn.sendMessage(m.chat, {
-                        image: { url: imagenSerBot },
-                        caption: '🤖 *Sub-Bot de Asta*\n\n¡Escanea el QR de arriba! ⬆️'
-                    }, { quoted: m })
-                }
-
-                if (txtQR && txtQR.key) {
-                    setTimeout(() => { 
-                        conn.sendMessage(m.sender, { delete: txtQR.key })
-                    }, 45000)
-                }
-                return
-            } 
-
-            // Mostrar código de pairing
-            if (qr && mcode) {
-                try {
-                    let secret = await sock.requestPairingCode((m.sender.split`@`[0]))
-                    secret = secret.match(/.{1,4}/g)?.join("-")
-
-                    txtCode = await conn.sendMessage(m.chat, {
+                // Enviar todo en paralelo
+                Promise.all([
+                    conn.sendMessage(m.chat, {
                         image: { url: imagenSerBot },
                         caption: rtx2
-                    }, { quoted: m })
-
-                    codeBot = await m.reply(`\`${secret}\``)
-                    console.log(chalk.cyan(`📱 Código pairing generado: ${secret}`))
-                } catch (e) {
-                    console.error('Error generando pairing code:', e)
-                    await m.reply('❌ Error generando código de pairing')
-                }
-            }
-
-            if (txtCode && txtCode.key) {
-                setTimeout(() => { 
-                    conn.sendMessage(m.sender, { delete: txtCode.key })
-                }, 45000)
-            }
-
-            if (codeBot && codeBot.key) {
-                setTimeout(() => { 
-                    conn.sendMessage(m.sender, { delete: codeBot.key })
-                }, 45000)
-            }
-
-            // Manejar cierre de conexión
-            if (connection === 'close') {
-                const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
-
-                console.log(chalk.yellow(`🔌 Conexión cerrada: ${userId}, Razón: ${reason}`))
-
-                if (reason === DisconnectReason.badSession || reason === 405 || reason === 401) {
-                    console.log(chalk.magenta(`🗑️ Eliminando sesión inválida: ${userId}`))
-
-                    try {
-                        if (fs.existsSync(pathAstaJadiBot)) {
-                            fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
-                            console.log(chalk.green(`✅ Sesión eliminada: ${userId}`))
-                        }
-                    } catch (error) {
-                        console.error(chalk.red('❌ Error eliminando sesión:', error))
-                    }
-
-                    // Eliminar de listas
-                    if (sock.user?.jid && global.activeSubBots) {
-                        global.activeSubBots.delete(sock.user.jid)
-                    }
-
-                    // Eliminar de global.conns
-                    if (global.conns && Array.isArray(global.conns)) {
-                        const index = global.conns.indexOf(sock)
-                        if (index >= 0) {
-                            global.conns.splice(index, 1)
-                        }
-                    }
-                }
-            }
-
-            // Conexión exitosa
-            if (connection == `open`) {
-                await saveSubBotState()
-
-                // Registrar en listas activas
-                if (sock.user?.jid) {
-                    global.activeSubBots.set(sock.user.jid, {
-                        socket: sock,
-                        config: sock.subConfig,
-                        createdAt: Date.now(),
-                        lastActivity: Date.now()
-                    })
-
-                    // Agregar a global.conns si no está
-                    if (global.conns && Array.isArray(global.conns) && !global.conns.includes(sock)) {
-                        global.conns.push(sock)
-                    }
-                }
-
-                // Actualizar configuración
-                if (sock.user && sock.subConfig) {
-                    sock.subConfig.name = sock.user.name || sock.subConfig.name
-
-                    const updatedConfig = {
-                        ...sock.subConfig,
-                        jid: sock.user.jid,
-                        updatedAt: new Date().toISOString()
-                    }
-
-                    fs.writeFileSync(
-                        path.join(pathAstaJadiBot, 'config.json'),
-                        JSON.stringify(updatedConfig, null, 2)
-                    )
-
-                    sock.subConfig = updatedConfig
-
-                    console.log(chalk.bold.green(
-                        `\n🎉 SUBBOT CONECTADO EXITOSAMENTE\n` +
-                        `├─ Nombre: ${sock.user.name || 'Sin nombre'}\n` +
-                        `├─ JID: ${sock.user.jid}\n` +
-                        `├─ Dueño: ${m.sender}\n` +
-                        `├─ Prefijo: ${sock.subConfig.prefix}\n` +
-                        `└─ Sin prefijo: ${sock.subConfig.sinprefix ? '✅' : '❌'}\n`
-                    ))
-
-                    // Notificar al usuario
-                    if (m?.chat) {
-                        await conn.sendMessage(m.chat, { 
-                            text: `✅ *SubBot conectado exitosamente!*\n\n` +
-                                  `🤖 *Información:*\n` +
-                                  `• Nombre: ${sock.user.name || 'SubBot'}\n` +
-                                  `• Número: ${sock.user.jid}\n` +
-                                  `• Dueño: @${m.sender.split('@')[0]}\n\n` +
-                                  `⚙️ *Configuración:*\n` +
-                                  `• Prefijo: \`${sock.subConfig.prefix}\`\n` +
-                                  `• Sin prefijo: ${sock.subConfig.sinprefix ? '✅' : '❌'}\n` +
-                                  `• Modo: ${sock.subConfig.mode}\n\n` +
-                                  `📋 *Comandos disponibles:*\n` +
-                                  `• *${usedPrefix}config* - Configurar SubBot\n` +
-                                  `• *${usedPrefix}infobot* - Ver información\n` +
-                                  `• *${usedPrefix}kill ${userId}* - Eliminar SubBot`,
-                            mentions: [m.sender]
-                        }, { quoted: m })
-                    }
-                }
-
-                // Unirse a canales automáticamente
-                try {
-                    if (global.ch) {
-                        for (const value of Object.values(global.ch)) {
-                            if (typeof value === 'string' && value.endsWith('@newsletter')) {
-                                await sock.newsletterFollow(value).catch(() => {})
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error uniéndose a canales:', e)
-                }
+                    }, { quoted: m }),
+                    m.reply(`\`${secret}\``)
+                ]).then(([codeMsg, botMsg]) => {
+                    txtCode = codeMsg
+                    codeBot = botMsg
+                    
+                    setTimeout(() => { 
+                        conn.sendMessage(m.sender, { delete: txtCode.key }).catch(() => {})
+                        conn.sendMessage(m.sender, { delete: codeBot.key }).catch(() => {})
+                    }, 45000)
+                }).catch(() => {})
+                
+            } catch (e) {
+                await m.reply('❌ Error generando código de pairing')
             }
         }
 
-        // ============= VERIFICACIÓN PERIÓDICA =============
-        setInterval(async () => {
-            if (!sock.user) {
-                try { 
-                    sock.ws?.close() 
-                } catch (e) {}
-                sock.ev.removeAllListeners()
+        // MANEJAR DESCONEXIÓN
+        if (connection === 'close') {
+            const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
 
-                // Eliminar de global.conns
+            if (reason === DisconnectReason.badSession || reason === 405 || reason === 401) {
+                try {
+                    if (fs.existsSync(pathAstaJadiBot)) {
+                        fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
+                    }
+                } catch (error) {}
+
+                if (sock.user?.jid && global.activeSubBots) {
+                    global.activeSubBots.delete(sock.user.jid)
+                }
+
                 if (global.conns && Array.isArray(global.conns)) {
                     const index = global.conns.indexOf(sock)
                     if (index >= 0) {
@@ -523,26 +375,67 @@ export async function AstaJadiBot(options) {
                     }
                 }
             }
-        }, 30000)
+        }
 
-        // ============= CARGAR HANDLER =============
-        let handlerModule
+        // CONEXIÓN EXITOSA RÁPIDA
+        if (connection == `open`) {
+            await saveSubBotState()
+
+            if (sock.user?.jid) {
+                global.activeSubBots.set(sock.user.jid, {
+                    socket: sock,
+                    config: sock.subConfig,
+                    createdAt: Date.now(),
+                    lastActivity: Date.now()
+                })
+
+                if (global.conns && Array.isArray(global.conns) && !global.conns.includes(sock)) {
+                    global.conns.push(sock)
+                }
+            }
+
+            if (sock.user && sock.subConfig) {
+                sock.subConfig.name = sock.user.name || sock.subConfig.name
+
+                console.log(chalk.bold.green(
+                    `\n🎉 SUBBOT CONECTADO EN 2-3s!\n` +
+                    `├─ Nombre: ${sock.user.name || 'Sin nombre'}\n` +
+                    `├─ JID: ${sock.user.jid}\n` +
+                    `├─ Dueño: ${m.sender}\n` +
+                    `└─ Prefijo: ${sock.subConfig.prefix}\n`
+                ))
+
+                // Notificación rápida
+                if (m?.chat) {
+                    await conn.sendMessage(m.chat, { 
+                        text: `✅ *¡Vinculado en 2 segundos!*\n\n` +
+                              `🤖 *SubBot Activado:*\n` +
+                              `• ${sock.user.name || 'SubBot'}\n` +
+                              `• ${sock.user.jid}\n` +
+                              `• Dueño: @${m.sender.split('@')[0]}`,
+                        mentions: [m.sender]
+                    }, { quoted: m })
+                }
+            }
+        }
+    }
+
+    // ============= CARGAR HANDLER ASÍNCRONO =============
+    let handlerModule
+    setTimeout(async () => {
         try {
             handlerModule = await import('../../handler.js')
         } catch (e) {
-            console.error('Error cargando handler:', e)
             return
         }
 
         let creloadHandler = async function (restartConn) {
             try {
-                const Handler = await import(`../../handler.js?update=${Date.now()}`).catch(console.error)
+                const Handler = await import(`../../handler.js?update=${Date.now()}`).catch(() => {})
                 if (Handler && Object.keys(Handler).length) {
                     handlerModule = Handler
                 }
-            } catch (e) {
-                console.error('Error recargando handler:', e)
-            }
+            } catch (e) {}
 
             if (restartConn) {
                 const oldChats = sock.chats
@@ -578,23 +471,19 @@ export async function AstaJadiBot(options) {
         }
 
         creloadHandler(false)
-    })
+    }, 100) // Cargar handler después de 100ms
 }
 
-// ============= FUNCIONES AUXILIARES =============
+// ============= FUNCIÓN AUXILIAR =============
 function msToTime(duration) {
     var milliseconds = parseInt((duration % 1000) / 100),
         seconds = Math.floor((duration / 1000) % 60),
-        minutes = Math.floor((duration / (1000 * 60)) % 60),
-        hours = Math.floor((duration / (1000 * 60 * 60)) % 24)
+        minutes = Math.floor((duration / (1000 * 60)) % 60)
 
-    hours = (hours < 10) ? '0' + hours : hours
     minutes = (minutes < 10) ? '0' + minutes : minutes
     seconds = (seconds < 10) ? '0' + seconds : seconds
 
-    if (hours > 0) {
-        return hours + ' h, ' + minutes + ' m y ' + seconds + ' s'
-    } else if (minutes > 0) {
+    if (minutes > 0) {
         return minutes + ' m y ' + seconds + ' s'
     } else {
         return seconds + ' s'
