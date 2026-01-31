@@ -75,7 +75,7 @@ Selecciona una opción:`
     const buttons = [
       { 
         buttonId: `${usedPrefix}menu2`, 
-        buttonText: { displayText: '📜 MENÚ PRINCIPAL' }, 
+        buttonText: { displayText: '📜 MENÚ' }, 
         type: 1 
       },
       { 
@@ -85,7 +85,7 @@ Selecciona una opción:`
       },
       { 
         buttonId: `${usedPrefix}serbot`, 
-        buttonText: { displayText: '🤖 CREAR SUB-BOT' }, 
+        buttonText: { displayText: '🤖 SUB-BOT' }, 
         type: 1 
       },
       { 
