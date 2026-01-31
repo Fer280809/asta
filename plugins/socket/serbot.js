@@ -6,7 +6,7 @@ import path from "path"
 import pino from 'pino'
 import chalk from 'chalk'
 import * as ws from 'ws'
-const { child, spawn, exec } = await import('child_process')
+const { exec } = await import('child_process')
 const { CONNECTING } = ws
 import { makeWASocket } from '../../lib/simple.js'
 import { fileURLToPath } from 'url'
@@ -79,6 +79,9 @@ function isSubBotConnected(jid) {
         }
     })
 }
+
+// ============= FUNCIÓN CON DELAY =============
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 // ============= HANDLER PRINCIPAL =============
 let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
@@ -225,14 +228,18 @@ export async function AstaJadiBot(options) {
         msgRetryCache, 
         browser: ['Chrome (Linux)', '', ''],
         version: version,
-        generateHighQualityLinkPreview: true,
+        generateHighQualityLinkPreview: false, // REDUCIDO
         syncFullHistory: false,
-        fireInitQueries: true,
+        fireInitQueries: false, // DESACTIVADO
         emitOwnEvents: false,
-        defaultQueryTimeoutMs: 10000,
-        connectTimeoutMs: 10000,
-        keepAliveIntervalMs: 10000,
-        maxIdleTimeMs: 15000
+        defaultQueryTimeoutMs: 15000, // AUMENTADO
+        connectTimeoutMs: 20000, // AUMENTADO
+        keepAliveIntervalMs: 30000, // AUMENTADO
+        maxIdleTimeMs: 30000, // AUMENTADO
+        transactionOpts: {
+            maxRetries: 2, // REDUCIDO
+            delay: 1000
+        }
     }
 
     let sock = makeWASocket(connectionOptions)
@@ -298,58 +305,76 @@ export async function AstaJadiBot(options) {
         // GENERAR QR INMEDIATAMENTE (2-3 segundos)
         if (qr && !mcode) {
             try {
-                // Generar QR de forma asíncrona sin bloquear
-                qrcode.toBuffer(qr, { scale: 6 }, async (err, buffer) => {
-                    if (err) return
-                    
-                    if (m?.chat) {
-                        txtQR = await conn.sendMessage(m.chat, { 
-                            image: buffer, 
-                            caption: rtx.trim()
-                        }, { quoted: m })
+                // Generar QR con delay para evitar rate limit
+                await delay(500) // Pequeño delay antes de generar
+                
+                const buffer = await qrcode.toBuffer(qr, { scale: 5 }) // Escala reducida
+                
+                if (m?.chat) {
+                    // Enviar QR primero con delay
+                    txtQR = await conn.sendMessage(m.chat, { 
+                        image: buffer, 
+                        caption: rtx.trim()
+                    }, { quoted: m }).catch(() => {})
 
-                        // Enviar imagen de bot en paralelo
-                        conn.sendMessage(m.chat, {
-                            image: { url: imagenSerBot },
-                            caption: '🤖 *Sub-Bot de Asta*\n\n¡Escanea el QR de arriba! ⬆️'
-                        }, { quoted: m }).catch(() => {})
-                    }
+                    // Delay de 1.5 segundos entre mensajes
+                    await delay(1500)
 
-                    if (txtQR && txtQR.key) {
-                        setTimeout(() => { 
-                            conn.sendMessage(m.sender, { delete: txtQR.key }).catch(() => {})
-                        }, 45000)
-                    }
-                })
-            } catch (e) {}
+                    // Enviar imagen de bot
+                    await conn.sendMessage(m.chat, {
+                        image: { url: imagenSerBot },
+                        caption: '🤖 *Sub-Bot de Asta*\n\n¡Escanea el QR de arriba! ⬆️'
+                    }, { quoted: m }).catch(() => {})
+                }
+
+                // Programar eliminación con delay
+                if (txtQR && txtQR.key) {
+                    setTimeout(() => { 
+                        conn.sendMessage(m.sender, { delete: txtQR.key }).catch(() => {})
+                    }, 45000)
+                }
+            } catch (e) {
+                console.error('Error generando QR:', e)
+            }
             return
         } 
 
-        // GENERAR CÓDIGO DE PAIRING RÁPIDO
+        // GENERAR CÓDIGO DE PAIRING RÁPIDO CON DELAYS
         if (qr && mcode) {
             try {
+                // Delay antes de solicitar código
+                await delay(1000)
+                
                 let secret = await sock.requestPairingCode((m.sender.split`@`[0]))
                 secret = secret.match(/.{1,4}/g)?.join("-")
 
-                // Enviar todo en paralelo
-                Promise.all([
-                    conn.sendMessage(m.chat, {
-                        image: { url: imagenSerBot },
-                        caption: rtx2
-                    }, { quoted: m }),
-                    m.reply(`\`${secret}\``)
-                ]).then(([codeMsg, botMsg]) => {
-                    txtCode = codeMsg
-                    codeBot = botMsg
-                    
-                    setTimeout(() => { 
+                // Enviar imagen con delay
+                txtCode = await conn.sendMessage(m.chat, {
+                    image: { url: imagenSerBot },
+                    caption: rtx2
+                }, { quoted: m }).catch(() => {})
+
+                // Delay antes de enviar código
+                await delay(2000)
+
+                codeBot = await m.reply(`\`${secret}\``).catch(() => {})
+                
+                // Programar eliminaciones con delays
+                setTimeout(() => { 
+                    if (txtCode && txtCode.key) {
                         conn.sendMessage(m.sender, { delete: txtCode.key }).catch(() => {})
+                    }
+                }, 45000)
+                
+                setTimeout(() => { 
+                    if (codeBot && codeBot.key) {
                         conn.sendMessage(m.sender, { delete: codeBot.key }).catch(() => {})
-                    }, 45000)
-                }).catch(() => {})
+                    }
+                }, 46000)
                 
             } catch (e) {
-                await m.reply('❌ Error generando código de pairing')
+                console.error('Error generando pairing code:', e)
+                await m.reply('❌ Error generando código de pairing').catch(() => {})
             }
         }
 
@@ -377,7 +402,7 @@ export async function AstaJadiBot(options) {
             }
         }
 
-        // CONEXIÓN EXITOSA RÁPIDA
+        // CONEXIÓN EXITOSA RÁPIDA CON DELAYS
         if (connection == `open`) {
             await saveSubBotState()
 
@@ -405,23 +430,25 @@ export async function AstaJadiBot(options) {
                     `└─ Prefijo: ${sock.subConfig.prefix}\n`
                 ))
 
-                // Notificación rápida
+                // Notificación con delay para evitar rate limit
                 if (m?.chat) {
+                    await delay(2500) // Delay de 2.5 segundos
+                    
                     await conn.sendMessage(m.chat, { 
-                        text: `✅ *¡Vinculado en 2 segundos!*\n\n` +
+                        text: `✅ *¡Vinculado exitosamente!*\n\n` +
                               `🤖 *SubBot Activado:*\n` +
                               `• ${sock.user.name || 'SubBot'}\n` +
                               `• ${sock.user.jid}\n` +
-                              `• Dueño: @${m.sender.split('@')[0]}`,
+                              `• Dueño: @${m.sender.split('@')[0]}\n\n` +
+                              `⏱️ *Tiempo de vinculación:* 2-3 segundos`,
                         mentions: [m.sender]
-                    }, { quoted: m })
+                    }, { quoted: m }).catch(() => {})
                 }
             }
         }
     }
 
-    // ============= CARGAR HANDLER ASÍNCRONO =============
-    let handlerModule
+    // ============= CARGAR HANDLER ASÍNCRONO CON DELAY =============
     setTimeout(async () => {
         try {
             handlerModule = await import('../../handler.js')
@@ -471,7 +498,7 @@ export async function AstaJadiBot(options) {
         }
 
         creloadHandler(false)
-    }, 100) // Cargar handler después de 100ms
+    }, 500) // Delay de 500ms
 }
 
 // ============= FUNCIÓN AUXILIAR =============
