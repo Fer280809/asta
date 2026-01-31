@@ -1,8 +1,6 @@
 // ============================================
-// plugins/rpg/missions.js (VERSIÓN CON SISTEMA ALEATORIO)
+// plugins/rpg/missions.js
 // ============================================
-
-// Importar el sistema de misiones aleatorias
 import { missionSystem } from '../../lib/rpg/mission-system.js';
 
 const handler = async (m, { conn, usedPrefix, command, text }) => {
@@ -12,7 +10,7 @@ const handler = async (m, { conn, usedPrefix, command, text }) => {
     }
 
     const user = global.db.data.users[m.sender];
-    
+
     // Inicializar usuario si no existe
     if (!user) {
         global.db.data.users[m.sender] = {
@@ -26,204 +24,167 @@ const handler = async (m, { conn, usedPrefix, command, text }) => {
             fishedToday: 0,
             craftedToday: 0,
             soldToday: 0,
+            workedToday: 0,
+            adventuresToday: 0,
+            crimesToday: 0,
+            dungeonsToday: 0,
             inventory: {
                 resources: {},
-                tools: { pickaxe: 'basic', axe: 'basic', fishingRod: 'basic' },
-                durability: { pickaxe: 100, axe: 100, fishingRod: 100 },
                 missions: {
-                    daily: { streak: 0, lastCompleted: 0, completed: [], lastClaimed: {} },
-                    weekly: { completed: [], lastClaimed: {} },
-                    monthly: { completed: [], lastClaimed: {} }
+                    daily: { completed: [] },
+                    weekly: { completed: [] },
+                    monthly: { completed: [] }
                 }
             }
         };
     }
-    
-    // Asegurar estructura básica
+
+    // Asegurar campos básicos
     user.coin = user.coin || 1000;
     user.bank = user.bank || 0;
     user.health = user.health || 100;
     user.level = user.level || 1;
     user.xp = user.xp || 0;
-    
-    // Inicializar tracking diario
+
+    // Asegurar contadores diarios
     user.minedToday = user.minedToday || 0;
     user.choppedToday = user.choppedToday || 0;
     user.fishedToday = user.fishedToday || 0;
     user.craftedToday = user.craftedToday || 0;
     user.soldToday = user.soldToday || 0;
-    
-    // Asegurar estructura de inventario y misiones
+    user.workedToday = user.workedToday || 0;
+    user.adventuresToday = user.adventuresToday || 0;
+    user.crimesToday = user.crimesToday || 0;
+    user.dungeonsToday = user.dungeonsToday || 0;
+
+    // Asegurar inventario y misiones
     if (!user.inventory) user.inventory = {};
+    if (!user.inventory.resources) user.inventory.resources = {};
     if (!user.inventory.missions) {
         user.inventory.missions = {
-            daily: { streak: 0, lastCompleted: 0, completed: [], lastClaimed: {} },
-            weekly: { completed: [], lastClaimed: {} },
-            monthly: { completed: [], lastClaimed: {} }
+            daily: { completed: [] },
+            weekly: { completed: [] },
+            monthly: { completed: [] }
         };
     }
 
-    // Obtener argumentos
+    // Argumentos
     const args = text ? text.trim().split(/ +/) : [];
     const action = args[0]?.toLowerCase() || 'view';
-    const missionType = args[1]?.toLowerCase() || 'daily';
-    
-    // FUNCIÓN para verificar progreso de misión
-    const checkMissionProgress = (user, mission) => {
-        switch(mission.requirement.type) {
-            case 'mine':
-                return (user.minedToday || 0) >= mission.requirement.amount;
-            case 'chop':
-                return (user.choppedToday || 0) >= mission.requirement.amount;
-            case 'fish':
-                return (user.fishedToday || 0) >= mission.requirement.amount;
-            case 'craft':
-                return (user.craftedToday || 0) >= mission.requirement.amount;
-            case 'sell':
-                return (user.soldToday || 0) >= mission.requirement.amount;
-            case 'bank':
-                return (user.bank || 0) >= mission.requirement.amount;
-            case 'collect':
-                if (!mission.requirement.resources) return false;
-                return mission.requirement.resources.every(res => 
-                    (user.inventory?.resources?.[res] || 0) >= mission.requirement.amount
-                );
-            case 'streak':
-                return (user.inventory.missions.daily.streak || 0) >= mission.requirement.amount;
-            default:
-                return false;
-        }
-    };
-
-    // FUNCIÓN para obtener progreso actual
-    const getMissionProgress = (user, mission) => {
-        switch(mission.requirement.type) {
-            case 'mine': return user.minedToday || 0;
-            case 'chop': return user.choppedToday || 0;
-            case 'fish': return user.fishedToday || 0;
-            case 'craft': return user.craftedToday || 0;
-            case 'sell': return user.soldToday || 0;
-            case 'bank': return user.bank || 0;
-            case 'collect':
-                if (!mission.requirement.resources) return 0;
-                const minResource = Math.min(...mission.requirement.resources.map(res => 
-                    user.inventory?.resources?.[res] || 0
-                ));
-                return minResource;
-            case 'streak': return user.inventory.missions.daily.streak || 0;
-            default: return 0;
-        }
-    };
-
-    // FUNCIÓN para formatear tiempo restante
-    const formatTimeRemaining = (nextReset) => {
-        const now = Date.now();
-        const diff = nextReset - now;
-        
-        if (diff <= 0) return '¡Ahora mismo!';
-        
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (hours > 0) {
-            return `${hours}h ${minutes}m`;
-        }
-        return `${minutes}m`;
-    };
 
     // --- VER MISIONES ---
-    if (action === 'view' || action === 'ver' || !action) {
-        // Obtener misiones aleatorias del sistema
+    if (action === 'view' || action === 'ver') {
         const dailyMissions = missionSystem.getMissions('daily');
         const weeklyMissions = missionSystem.getMissions('weekly');
         const monthlyMissions = missionSystem.getMissions('monthly');
-        
+
         // Tiempos de reinicio
         const now = Date.now();
         const dailyReset = missionSystem.lastReset.daily + (24 * 60 * 60 * 1000);
         const weeklyReset = missionSystem.lastReset.weekly + (7 * 24 * 60 * 60 * 1000);
         const monthlyReset = missionSystem.lastReset.monthly + (30 * 24 * 60 * 60 * 1000);
-        
-        let text = `╭━━━━━━━━━━━━━━━━━━━━━╮
-┃   🎯 *MISIONES ALEATORIAS*   🎯
-┃━━━━━━━━━━━━━━━━━━━━━┃
-👤 *Usuario:* ${await conn.getName(m.sender)}
-📅 *Racha actual:* ${user.inventory.missions.daily.streak || 0} día${(user.inventory.missions.daily.streak || 0) !== 1 ? 's' : ''}
-💰 *Monedas:* ¥${(user.coin || 0).toLocaleString()}
-🎚️ *Nivel:* ${user.level || 1}\n\n`;
 
-        // Mostrar tiempo de reinicio
+        const formatTime = (timestamp) => {
+            const diff = timestamp - now;
+            if (diff <= 0) return '¡Ahora!';
+            
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            return `${hours}h ${minutes}m`;
+        };
+
+        let text = `╭━━━━━━━━━━━━━━━━━━━━━━━╮
+┃     🎯 *MISIONES RPG*     🎯
+┃━━━━━━━━━━━━━━━━━━━━━━━┃
+👤 *Usuario:* ${await conn.getName(m.sender)}
+💰 *Monedas:* ¥${user.coin.toLocaleString()}
+🎚️ *Nivel:* ${user.level}\n\n`;
+
         text += `⏰ *Reinicio en:*\n`;
-        text += `▸ Diarias: ${formatTimeRemaining(dailyReset)}\n`;
-        text += `▸ Semanales: ${formatTimeRemaining(weeklyReset)}\n`;
-        text += `▸ Mensuales: ${formatTimeRemaining(monthlyReset)}\n\n`;
+        text += `├ Diarias: ${formatTime(dailyReset)}\n`;
+        text += `├ Semanales: ${formatTime(weeklyReset)}\n`;
+        text += `└ Mensuales: ${formatTime(monthlyReset)}\n\n`;
 
         // MISIONES DIARIAS
         text += `📅 *MISIONES DIARIAS:*\n\n`;
-        
+
         if (dailyMissions.length === 0) {
-            text += `🔄 *Generando nuevas misiones...*\n`;
-            text += `Vuelve a usar el comando en unos segundos.\n\n`;
+            text += `🔄 Generando misiones...\n\n`;
         } else {
             dailyMissions.forEach((mission, index) => {
-                const completed = user.inventory.missions.daily.completed?.includes(mission.id) || false;
-                const canClaim = checkMissionProgress(user, mission) && !completed;
-                const progress = getMissionProgress(user, mission);
+                const isCompleted = missionSystem.isMissionCompleted(user, mission);
+                const alreadyClaimed = user.inventory.missions.daily.completed.includes(mission.id);
+                const progress = missionSystem.getUserProgress(user, mission);
                 const total = mission.requirement.amount;
                 const percentage = Math.min(Math.floor((progress / total) * 100), 100);
-                
+
                 // Barra de progreso
                 const barLength = 10;
                 const filled = Math.floor((percentage / 100) * barLength);
                 const bar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
-                
-                text += `${completed ? '✅' : canClaim ? '🎯' : '📌'} *${index + 1}. ${mission.name}*\n`;
+
+                text += `${alreadyClaimed ? '✅' : isCompleted ? '🎯' : '📌'} *${index + 1}. ${mission.name}*\n`;
                 text += `   ${mission.description}\n`;
                 text += `   [${bar}] ${progress}/${total} (${percentage}%)\n`;
                 text += `   🎁 Recompensa: ¥${mission.reward.coin.toLocaleString()}`;
-                
+
                 if (mission.reward.resource) {
                     text += ` + ${mission.reward.amount}x ${mission.reward.resource}`;
                 }
-                if (mission.reward.special) {
-                    text += ` + ${mission.reward.special.replace('_', ' ')}`;
+                if (mission.reward.exp) {
+                    text += ` + ${mission.reward.exp} EXP`;
                 }
-                text += `\n   📌 ${usedPrefix}mission claim daily ${index + 1}\n\n`;
+                if (mission.reward.health) {
+                    text += ` + ${mission.reward.health} ❤️`;
+                }
+                if (mission.reward.special) {
+                    text += ` + ${mission.reward.special}`;
+                }
+
+                if (isCompleted && !alreadyClaimed) {
+                    text += `\n   💡 *${usedPrefix}mission claim daily ${index + 1}*\n`;
+                }
+                text += `\n`;
             });
         }
 
-        // MISIONES SEMANALES (si existen)
+        // MISIONES SEMANALES
         if (weeklyMissions.length > 0) {
             text += `🗓️ *MISIONES SEMANALES:*\n\n`;
             weeklyMissions.forEach((mission, index) => {
-                const completed = user.inventory.missions.weekly.completed?.includes(mission.id) || false;
-                text += `${completed ? '✅' : '📌'} *${mission.name}*\n`;
+                const alreadyClaimed = user.inventory.missions.weekly.completed.includes(mission.id);
+                
+                text += `${alreadyClaimed ? '✅' : '📌'} *${mission.name}*\n`;
                 text += `   ${mission.description}\n`;
                 text += `   🎁 Recompensa: ¥${mission.reward.coin.toLocaleString()}`;
+                
                 if (mission.reward.special) {
-                    text += ` + ${mission.reward.special.replace('_', ' ')}`;
+                    text += ` + ${mission.reward.special}`;
                 }
                 text += `\n\n`;
             });
         }
 
-        // MISIONES MENSUALES (si existen)
+        // MISIONES MENSUALES
         if (monthlyMissions.length > 0) {
             text += `📊 *MISIONES MENSUALES:*\n\n`;
             monthlyMissions.forEach((mission, index) => {
-                const completed = user.inventory.missions.monthly.completed?.includes(mission.id) || false;
-                text += `${completed ? '✅' : '📌'} *${mission.name}*\n`;
+                const alreadyClaimed = user.inventory.missions.monthly.completed.includes(mission.id);
+                
+                text += `${alreadyClaimed ? '✅' : '📌'} *${mission.name}*\n`;
                 text += `   ${mission.description}\n`;
                 text += `   🎁 Recompensa: ¥${mission.reward.coin.toLocaleString()}`;
+                
                 if (mission.reward.special) {
-                    text += ` + ${mission.reward.special.replace('_', ' ')}`;
+                    text += ` + ${mission.reward.special}`;
                 }
                 text += `\n\n`;
             });
         }
 
-        text += `╰━━━━━━━━━━━━━━━━━━━━━╯\n`;
-        text += `📌 *Uso:* ${usedPrefix}mission claim [daily/weekly/monthly] [número]`;
+        text += `╰━━━━━━━━━━━━━━━━━━━━━━━╯\n`;
+        text += `📌 *Usa:* ${usedPrefix}mission claim [daily/weekly/monthly] [número]`;
 
         await conn.reply(m.chat, text, m);
         return;
@@ -231,48 +192,48 @@ const handler = async (m, { conn, usedPrefix, command, text }) => {
 
     // --- RECLAMAR MISIÓN ---
     if (action === 'claim' || action === 'reclamar') {
-        const missionType = args[1]?.toLowerCase() || 'daily';
-        const missionNumber = parseInt(args[2]);
-        
-        if (isNaN(missionNumber) || missionNumber < 1) {
+        const type = args[1]?.toLowerCase() || 'daily';
+        const number = parseInt(args[2]);
+
+        if (isNaN(number) || number < 1) {
             return m.reply(`❌ Número inválido.\nUso: *${usedPrefix}mission claim [daily/weekly/monthly] [número]*\nEjemplo: *${usedPrefix}mission claim daily 1*`);
         }
+
+        // Obtener misiones
+        let missions, completedList;
         
-        // Obtener misiones del tipo especificado
-        let missions, userMissions;
-        
-        switch(missionType) {
+        switch(type) {
             case 'daily':
                 missions = missionSystem.getMissions('daily');
-                userMissions = user.inventory.missions.daily;
+                completedList = user.inventory.missions.daily.completed;
                 break;
             case 'weekly':
                 missions = missionSystem.getMissions('weekly');
-                userMissions = user.inventory.missions.weekly;
+                completedList = user.inventory.missions.weekly.completed;
                 break;
             case 'monthly':
                 missions = missionSystem.getMissions('monthly');
-                userMissions = user.inventory.missions.monthly;
+                completedList = user.inventory.missions.monthly.completed;
                 break;
             default:
                 return m.reply(`❌ Tipo inválido. Usa: daily, weekly o monthly`);
         }
-        
-        if (missionNumber > missions.length) {
-            return m.reply(`❌ Solo hay ${missions.length} misiones ${missionType}.`);
+
+        if (number > missions.length) {
+            return m.reply(`❌ Solo hay ${missions.length} misiones ${type}.`);
         }
-        
-        const missionIndex = missionNumber - 1;
+
+        const missionIndex = number - 1;
         const mission = missions[missionIndex];
-        
-        // Verificar si ya completó
-        if (userMissions.completed?.includes(mission.id)) {
-            return m.reply(`⚠️ Ya has reclamado esta misión ${missionType}.`);
+
+        // Verificar si ya reclamó
+        if (completedList.includes(mission.id)) {
+            return m.reply(`⚠️ Ya has reclamado esta misión ${type}.`);
         }
-        
-        // Verificar progreso
-        if (!checkMissionProgress(user, mission)) {
-            const progress = getMissionProgress(user, mission);
+
+        // Verificar si está completada
+        if (!missionSystem.isMissionCompleted(user, mission)) {
+            const progress = missionSystem.getUserProgress(user, mission);
             const needed = mission.requirement.amount - progress;
             
             let progressText = '';
@@ -286,84 +247,59 @@ const handler = async (m, { conn, usedPrefix, command, text }) => {
                 case 'fish':
                     progressText = `🎣 Pesca: ${progress}/${mission.requirement.amount} (faltan ${needed})`;
                     break;
+                case 'work':
+                    progressText = `💼 Trabajo: ${progress}/${mission.requirement.amount} (faltan ${needed})`;
+                    break;
                 case 'bank':
-                    progressText = `🏦 Banco: ¥${progress.toLocaleString()}/${mission.requirement.amount.toLocaleString()}`;
+                    progressText = `🏦 Banco: ¥${progress.toLocaleString()}/¥${mission.requirement.amount.toLocaleString()}`;
                     break;
-                case 'collect':
-                    progressText = `📦 Recursos: ${progress}/${mission.requirement.amount}`;
-                    break;
+                default:
+                    progressText = `Progreso: ${progress}/${mission.requirement.amount}`;
             }
-            
+
             return m.reply(`❌ *Aún no completas la misión!*\n${progressText}`);
         }
-        
+
         // OTORGAR RECOMPENSAS
-        userMissions.completed.push(mission.id);
+        completedList.push(mission.id);
         user.coin += mission.reward.coin;
-        
+        user.xp += mission.reward.exp || 0;
+        user.health = Math.min(100, user.health + (mission.reward.health || 0));
+
         // Recurso especial
         if (mission.reward.resource) {
-            if (!user.inventory.resources) user.inventory.resources = {};
             user.inventory.resources[mission.reward.resource] = 
                 (user.inventory.resources[mission.reward.resource] || 0) + (mission.reward.amount || 1);
         }
-        
-        // Incrementar racha para misiones diarias
-        if (missionType === 'daily') {
-            user.inventory.missions.daily.streak = (user.inventory.missions.daily.streak || 0) + 1;
-            user.inventory.missions.daily.lastCompleted = Date.now();
-            
-            // Recompensa especial por racha de 3 días
-            const streak = user.inventory.missions.daily.streak;
-            if (streak >= 3 && !userMissions.completed.includes('streak_reward_3')) {
-                userMissions.completed.push('streak_reward_3');
-                
-                // Otorgar personaje especial
-                if (!user.harem) user.harem = [];
-                user.harem.push({
-                    id: `streak_${Date.now()}`,
-                    name: 'Personaje de Racha',
-                    claimedAt: Date.now(),
-                    from: '3_day_streak',
-                    rarity: 'epic'
-                });
-                
-                await m.reply(`🎉 *¡MISIÓN COMPLETADA Y RACHA ALCANZADA!*\n\n` +
-                             `✅ ${mission.name}\n` +
-                             `💰 Recompensa: ¥${mission.reward.coin.toLocaleString()}\n` +
-                             `${mission.reward.resource ? `📦 +${mission.reward.amount}x ${mission.reward.resource}\n` : ''}` +
-                             `🔥 *Bonus Racha x${streak}:* ¡Personaje épico obtenido!\n` +
-                             `📅 Nueva racha: ${streak} día${streak !== 1 ? 's' : ''}`);
-                await global.db.write();
-                return;
-            }
-        }
-        
+
         // Mensaje de éxito
-        let rewardText = `🎉 *¡MISIÓN ${missionType.toUpperCase()} COMPLETADA!*\n\n` +
-                        `✅ ${mission.name}\n` +
-                        `💰 Recompensa: ¥${mission.reward.coin.toLocaleString()}\n`;
+        let rewardText = `🎉 *¡MISIÓN ${type.toUpperCase()} COMPLETADA!*\n\n`;
+        rewardText += `✅ ${mission.name}\n`;
+        rewardText += `💰 +¥${mission.reward.coin.toLocaleString()}\n`;
         
+        if (mission.reward.exp) {
+            rewardText += `⭐ +${mission.reward.exp} EXP\n`;
+        }
+        if (mission.reward.health) {
+            rewardText += `❤️ +${mission.reward.health} Salud\n`;
+        }
         if (mission.reward.resource) {
-            rewardText += `📦 +${mission.reward.amount || 1}x ${mission.reward.resource}\n`;
+            rewardText += `📦 +${mission.reward.amount}x ${mission.reward.resource}\n`;
         }
         if (mission.reward.special) {
-            rewardText += `🎁 + ${mission.reward.special.replace('_', ' ')}\n`;
+            rewardText += `✨ ${mission.reward.special.replace('_', ' ')}\n`;
         }
-        if (missionType === 'daily') {
-            rewardText += `📅 Racha: ${user.inventory.missions.daily.streak || 0} día${(user.inventory.missions.daily.streak || 0) !== 1 ? 's' : ''}`;
-        }
-        
+
         await m.reply(rewardText);
         await global.db.write();
         return;
     }
 
-    // --- VER PROGRESO ---
+    // --- PROGRESO ---
     if (action === 'progress' || action === 'progreso') {
-        let text = `╭━━━━━━━━━━━━━━━━━━━━━╮
-┃    📊 *TU PROGRESO*    📊
-┃━━━━━━━━━━━━━━━━━━━━━┃\n`;
+        let text = `╭━━━━━━━━━━━━━━━━━━━━━━━╮
+┃      📊 *PROGRESO*      📊
+┃━━━━━━━━━━━━━━━━━━━━━━━┃\n`;
 
         text += `📈 *ESTADÍSTICAS DIARIAS:*\n\n`;
         text += `⛏️  Minado: ${user.minedToday || 0}\n`;
@@ -371,131 +307,146 @@ const handler = async (m, { conn, usedPrefix, command, text }) => {
         text += `🎣  Pesca: ${user.fishedToday || 0}\n`;
         text += `⚒️  Crafteo: ${user.craftedToday || 0}\n`;
         text += `💰  Ventas: ${user.soldToday || 0}\n`;
-        text += `🏦  Banco: ¥${(user.bank || 0).toLocaleString()}\n\n`;
-        
+        text += `💼  Trabajos: ${user.workedToday || 0}\n`;
+        text += `⚔️  Aventuras: ${user.adventuresToday || 0}\n`;
+        text += `🦹  Crímenes: ${user.crimesToday || 0}\n`;
+        text += `🏰  Mazmorras: ${user.dungeonsToday || 0}\n`;
+        text += `🏦  Banco: ¥${user.bank.toLocaleString()}\n\n`;
+
         text += `🏆 *LOGROS:*\n`;
-        text += `📅 Racha diaria: ${user.inventory.missions.daily.streak || 0} día${(user.inventory.missions.daily.streak || 0) !== 1 ? 's' : ''}\n`;
-        text += `✅ Misiones diarias: ${user.inventory.missions.daily.completed?.length || 0}\n`;
-        text += `✅ Misiones semanales: ${user.inventory.missions.weekly.completed?.length || 0}\n`;
-        text += `✅ Misiones mensuales: ${user.inventory.missions.monthly.completed?.length || 0}\n`;
-        text += `💰 Monedas totales: ¥${(user.coin || 0).toLocaleString()}\n`;
-        text += `❤️  Salud: ${user.health || 100}/100\n`;
-        text += `🎚️  Nivel: ${user.level || 1}\n`;
-        text += `⭐  XP: ${user.xp || 0}\n\n`;
-        
-        // Mostrar progreso de misiones actuales
-        const dailyMissions = missionSystem.getMissions('daily');
-        if (dailyMissions.length > 0) {
-            text += `🎯 *PROGRESO ACTUAL:*\n`;
-            dailyMissions.forEach((mission, index) => {
-                const progress = getMissionProgress(user, mission);
-                const total = mission.requirement.amount;
-                const percentage = Math.min(Math.floor((progress / total) * 100), 100);
-                
-                text += `${index + 1}. ${mission.name.split(' ')[1] || mission.name}: ${progress}/${total} (${percentage}%)\n`;
-            });
-        }
-        
-        text += `╰━━━━━━━━━━━━━━━━━━━━━╯`;
+        text += `✅ Misiones diarias: ${user.inventory.missions.daily.completed.length}\n`;
+        text += `✅ Misiones semanales: ${user.inventory.missions.weekly.completed.length}\n`;
+        text += `✅ Misiones mensuales: ${user.inventory.missions.monthly.completed.length}\n`;
+        text += `💰 Total monedas: ¥${user.coin.toLocaleString()}\n`;
+        text += `❤️  Salud: ${user.health}/100\n`;
+        text += `🎚️  Nivel: ${user.level}\n`;
+        text += `⭐  XP: ${user.xp}\n\n`;
+
+        text += `╰━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
         await conn.reply(m.chat, text, m);
-        return;
-    }
-
-    // --- RESET MANUAL (solo owners) ---
-    if (action === 'reset') {
-        const senderNumber = m.sender.split('@')[0];
-        if (!global.owner || !global.owner.includes(senderNumber)) {
-            return m.reply(`❌ Comando solo para owners.`);
-        }
-        
-        const type = args[1]?.toLowerCase() || 'daily';
-        
-        switch(type) {
-            case 'daily':
-                // Resetear sistema
-                missionSystem.dailyMissions = missionSystem.generateRandomMissions('daily', 3);
-                missionSystem.lastReset.daily = Date.now();
-                
-                // Resetear usuarios
-                Object.values(global.db.data.users).forEach(u => {
-                    u.minedToday = 0;
-                    u.choppedToday = 0;
-                    u.fishedToday = 0;
-                    u.craftedToday = 0;
-                    u.soldToday = 0;
-                    if (u.inventory?.missions?.daily) {
-                        u.inventory.missions.daily.completed = [];
-                    }
-                });
-                break;
-                
-            case 'weekly':
-                missionSystem.weeklyMissions = missionSystem.generateRandomMissions('weekly', 2);
-                missionSystem.lastReset.weekly = Date.now();
-                break;
-                
-            case 'monthly':
-                missionSystem.monthlyMissions = missionSystem.generateRandomMissions('monthly', 2);
-                missionSystem.lastReset.monthly = Date.now();
-                break;
-                
-            case 'all':
-                missionSystem.dailyMissions = missionSystem.generateRandomMissions('daily', 3);
-                missionSystem.weeklyMissions = missionSystem.generateRandomMissions('weekly', 2);
-                missionSystem.monthlyMissions = missionSystem.generateRandomMissions('monthly', 2);
-                missionSystem.lastReset = { daily: Date.now(), weekly: Date.now(), monthly: Date.now() };
-                break;
-                
-            default:
-                return m.reply(`❌ Tipo inválido. Usa: daily, weekly, monthly o all`);
-        }
-        
-        await m.reply(`✅ Misiones ${type} reiniciadas. Nuevas misiones generadas.`);
-        await global.db.write();
         return;
     }
 
     // --- HELP ---
     if (action === 'help' || action === 'ayuda') {
         await conn.reply(m.chat, 
-            `📘 *AYUDA - SISTEMA DE MISIONES ALEATORIAS*\n\n` +
+            `📘 *AYUDA - SISTEMA DE MISIONES*\n\n` +
             `🔀 *Características:*\n` +
-            `• Misiones diferentes cada día\n` +
+            `• Misiones diferentes cada día/semana/mes\n` +
             `• Recompensas aleatorias\n` +
-            `• Sistema de rachas\n` +
-            `• Misiones semanales y mensuales\n\n` +
-            `📌 *Comandos:*\n` +
-            `» ${usedPrefix}mission - Ver misiones actuales\n` +
-            `» ${usedPrefix}mission claim [tipo] [número] - Reclamar misión\n` +
-            `» ${usedPrefix}mission progress - Ver tu progreso\n` +
-            `» ${usedPrefix}mission reset [tipo] - Resetear (owners)\n\n` +
-            `🎯 *Ejemplos:*\n` +
-            `• ${usedPrefix}mission\n` +
-            `• ${usedPrefix}mission claim daily 1\n` +
-            `• ${usedPrefix}mission claim weekly 1\n` +
-            `• ${usedPrefix}mission progress\n\n` +
-            `💰 *Tipos de misiones:*\n` +
-            `• daily - Se renuevan cada 24h\n` +
-            `• weekly - Se renuevan cada 7 días\n` +
-            `• monthly - Se renuevan cada 30 días\n\n` +
-            `🔥 *Consejo:* Las misiones cambian automáticamente. ¡Revisa diariamente!`,
-        m);
+            `• Progreso automático\n` +
+            `• Sistema de recompensas\n\n` +
+            
+            `🎯 *Comandos:*\n` +
+            `• *${usedPrefix}mission* - Ver todas las misiones\n` +
+            `• *${usedPrefix}mission claim daily 1* - Reclamar misión diaria 1\n` +
+            `• *${usedPrefix}mission progress* - Ver tu progreso\n` +
+            `• *${usedPrefix}mission help* - Esta ayuda\n\n` +
+            
+            `💰 *Tipos de Misiones:*\n` +
+            `• *Diarias:* Se renuevan cada 24 horas\n` +
+            `• *Semanales:* Se renuevan cada 7 días\n` +
+            `• *Mensuales:* Se renuevan cada 30 días\n\n` +
+            
+            `🏆 *Cómo completar misiones:*\n` +
+            `Usa los comandos de economía para avanzar:\n` +
+            `- *${usedPrefix}work* para trabajos\n` +
+            `- *${usedPrefix}mine* para minería\n` +
+            `- *${usedPrefix}chop* para tala\n` +
+            `- *${usedPrefix}fish* para pesca\n` +
+            `- *${usedPrefix}adventure* para aventuras\n` +
+            `- *${usedPrefix}dungeon* para mazmorras\n` +
+            `- *${usedPrefix}crime* para crímenes\n\n` +
+            
+            `🎁 *Recompensas:*\n` +
+            `• Monedas (¥) 💰\n` +
+            `• Experiencia (EXP) ⭐\n` +
+            `• Salud (❤️)\n` +
+            `• Recursos especiales 📦\n` +
+            `• Ítems únicos ✨`
+        , m);
         return;
     }
 
-    // --- SI NO SE RECONOCE EL COMANDO ---
-    await conn.reply(m.chat, 
-        `❓ *Comando no reconocido:* "${action}"\n\n` +
-        `Usa *${usedPrefix}mission* para ver las misiones\n` +
-        `o *${usedPrefix}mission help* para ver ayuda completa.`,
-    m);
+    // --- RESET (solo owner) ---
+    if (action === 'reset') {
+        const senderNumber = m.sender.split('@')[0];
+        if (!global.owner || !global.owner.includes(senderNumber)) {
+            return m.reply(`❌ Solo para owners.`);
+        }
+
+        const type = args[1]?.toLowerCase() || 'daily';
+
+        switch(type) {
+            case 'daily':
+                missionSystem.dailyMissions = missionSystem.generateRandomMissions('daily', 5);
+                missionSystem.lastReset.daily = Date.now();
+                
+                // Resetear contadores diarios de todos los usuarios
+                Object.values(global.db.data.users).forEach(u => {
+                    u.minedToday = 0;
+                    u.choppedToday = 0;
+                    u.fishedToday = 0;
+                    u.craftedToday = 0;
+                    u.soldToday = 0;
+                    u.workedToday = 0;
+                    u.adventuresToday = 0;
+                    u.crimesToday = 0;
+                    u.dungeonsToday = 0;
+                    if (u.inventory?.missions?.daily) {
+                        u.inventory.missions.daily.completed = [];
+                    }
+                });
+                break;
+
+            case 'weekly':
+                missionSystem.weeklyMissions = missionSystem.generateRandomMissions('weekly', 3);
+                missionSystem.lastReset.weekly = Date.now();
+                Object.values(global.db.data.users).forEach(u => {
+                    if (u.inventory?.missions?.weekly) {
+                        u.inventory.missions.weekly.completed = [];
+                    }
+                });
+                break;
+
+            case 'monthly':
+                missionSystem.monthlyMissions = missionSystem.generateRandomMissions('monthly', 2);
+                missionSystem.lastReset.monthly = Date.now();
+                Object.values(global.db.data.users).forEach(u => {
+                    if (u.inventory?.missions?.monthly) {
+                        u.inventory.missions.monthly.completed = [];
+                    }
+                });
+                break;
+
+            case 'all':
+                missionSystem.dailyMissions = missionSystem.generateRandomMissions('daily', 5);
+                missionSystem.weeklyMissions = missionSystem.generateRandomMissions('weekly', 3);
+                missionSystem.monthlyMissions = missionSystem.generateRandomMissions('monthly', 2);
+                missionSystem.lastReset = { 
+                    daily: Date.now(), 
+                    weekly: Date.now(), 
+                    monthly: Date.now() 
+                };
+                break;
+
+            default:
+                return m.reply(`❌ Tipo inválido. Usa: daily, weekly, monthly o all`);
+        }
+
+        await m.reply(`✅ Misiones ${type} reiniciadas. Nuevas misiones generadas.`);
+        await global.db.write();
+        return;
+    }
+
+    // Por defecto, mostrar misiones
+    return handler(m, { conn, usedPrefix, command, text: 'view' });
 };
 
-// Configuración del handler
-handler.help = ['mission', 'misiones', 'quest'];
+handler.help = ['mission', 'misiones'];
 handler.tags = ['rpg'];
-handler.command = ['mission', 'misiones', 'quest'];
+handler.command = ['mission', 'missions', 'misiones', 'quest', 'quests'];
 handler.group = true;
 
 export default handler;
