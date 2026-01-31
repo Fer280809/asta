@@ -160,6 +160,8 @@ export async function AstaJadiBot(options) {
 
     const mcode = args[0]?.trim().match(/(--code|code)/) || args[1]?.trim().match(/(--code|code)/)
     let txtCode, codeBot, txtQR
+    let qrSent = false // ⚡ Control para evitar múltiples QR
+    let codeSent = false // ⚡ Control para evitar múltiples códigos
 
     if (mcode) {
         args[0] = args[0]?.replace(/^--code$|^code$/, "").trim()
@@ -204,7 +206,9 @@ export async function AstaJadiBot(options) {
             version,
             syncFullHistory: false, // ⚡ No sincronizar historial completo
             browser: ['Ubuntu', 'Chrome', '20.0.04'],
-            defaultQueryTimeoutMs: 20000, // ⚡ Reducido de default
+            defaultQueryTimeoutMs: 15000, // ⚡ Reducido para conexión más rápida
+            connectTimeoutMs: 10000, // ⚡ Timeout de conexión reducido
+            qrTimeout: 40000, // ⚡ Timeout del QR reducido
             getMessage: async (key) => {
                 if (store) {
                     const msg = await store.loadMessage(key.remoteJid, key.id)
@@ -267,8 +271,9 @@ export async function AstaJadiBot(options) {
         const connectionUpdate = async (update) => {
             const { connection, lastDisconnect, qr, isNewLogin } = update
 
-            // ⚡ Generar QR inmediatamente
-            if (qr && !args[0]) {
+            // ⚡ SOLO ENVIAR QR SI SE PIDIÓ QR (no code) y NO SE HA ENVIADO AÚN
+            if (qr && !mcode && !qrSent && !args[0]) {
+                qrSent = true // ⚡ Marcar como enviado
                 try {
                     const qrImage = await qrcode.toDataURL(qr, { scale: 8 })
                     const qrBuffer = Buffer.from(qrImage.split(',')[1], 'base64')
@@ -278,48 +283,42 @@ export async function AstaJadiBot(options) {
                         caption: rtx.trim()
                     }, { quoted: m })
 
-                    // ⚡ Auto-eliminar QR más rápido
+                    // ⚡ Auto-eliminar QR
                     setTimeout(() => {
                         if (txtQR?.key) conn.sendMessage(m.sender, { delete: txtQR.key })
-                    }, 30000) // 30 segundos en vez de 45
+                    }, 30000)
                 } catch (e) {
                     console.error('Error generando QR:', e)
+                    qrSent = false // Permitir reintento si falla
                 }
             }
 
-            // ⚡ Generar código de emparejamiento más rápido
-            if (mcode && !args[0] && !sock.authState?.creds?.registered) {
+            // ⚡ SOLO ENVIAR CODE SI SE PIDIÓ CODE y NO SE HA ENVIADO AÚN
+            if (mcode && !codeSent && !args[0] && !sock.authState?.creds?.registered) {
+                codeSent = true // ⚡ Marcar como enviado
                 try {
-                    if (!sock.authState.creds.registered) {
-                        // ⚡ Timeout reducido para código
-                        setTimeout(async () => {
-                            try {
-                                let codeA = await sock.requestPairingCode(m.sender.split('@')[0])
-                                codeA = codeA?.match(/.{1,4}/g)?.join('-') || codeA
-                                
-                                let codeMessage = rtx2.trim() + `\n\n💬 *Código de emparejamiento:*\n\n`
-                                
-                                // Enviar el texto primero
-                                await conn.sendMessage(m.chat, {
-                                    text: codeMessage
-                                }, { quoted: m })
-                                
-                                // Enviar el código en un mensaje separado
-                                codeBot = await conn.sendMessage(m.chat, {
-                                    text: `\`\`\`${codeA}\`\`\``
-                                }, { quoted: m })
+                    let codeA = await sock.requestPairingCode(m.sender.split('@')[0])
+                    codeA = codeA?.match(/.{1,4}/g)?.join('-') || codeA
+                    
+                    // Enviar el texto de instrucciones
+                    await conn.sendMessage(m.chat, {
+                        text: rtx2.trim()
+                    }, { quoted: m })
+                    
+                    // Enviar el código en mensaje separado
+                    await new Promise(resolve => setTimeout(resolve, 500)) // Pequeña pausa
+                    
+                    codeBot = await conn.sendMessage(m.chat, {
+                        text: `*Código:*\n\`\`\`${codeA}\`\`\``
+                    }, { quoted: m })
 
-                                // ⚡ Auto-eliminar código más rápido
-                                setTimeout(() => {
-                                    if (codeBot?.key) conn.sendMessage(m.sender, { delete: codeBot.key })
-                                }, 30000)
-                            } catch (e) {
-                                console.error('Error generando código:', e)
-                            }
-                        }, 2000) // ⚡ Reducido a 2 segundos
-                    }
+                    // ⚡ Auto-eliminar código
+                    setTimeout(() => {
+                        if (codeBot?.key) conn.sendMessage(m.sender, { delete: codeBot.key })
+                    }, 30000)
                 } catch (e) {
-                    console.error('Error en pairing code:', e)
+                    console.error('Error generando código:', e)
+                    codeSent = false // Permitir reintento si falla
                 }
             }
 
