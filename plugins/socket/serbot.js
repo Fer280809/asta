@@ -244,7 +244,6 @@ export async function AstaJadiBot(options) {
             msgRetryCache, 
             browser: ['Windows', 'Firefox'],
             version: version,
-            syncFullHistory: false, // ÚNICO CAMBIO: Desactivar sync de historial
             generateHighQualityLinkPreview: true
         }
 
