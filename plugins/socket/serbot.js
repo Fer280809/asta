@@ -62,9 +62,9 @@ if (!global.subBotsData) global.subBotsData = new Map()
 // ============= FUNCIÓN PARA VERIFICAR CONEXIÓN =============
 function isSubBotConnected(jid) { 
     if (!global.conns || !Array.isArray(global.conns)) return false
-    
+
     const targetJid = jid.split("@")[0]
-    
+
     return global.conns.some(sock => {
         try {
             if (!sock || !sock.user || !sock.user.jid) return false
@@ -89,10 +89,10 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     if (!globalThis.db.data.settings[conn.user.jid].jadibotmd) {
         return m.reply(`ꕥ El Comando *${command}* está desactivado temporalmente.`)
     }
-    
+
     // ============ VERIFICAR LÍMITE (CORREGIDO) ============
     let activeSubBotsCount = 0
-    
+
     if (global.conns && Array.isArray(global.conns)) {
         // Contar solo SubBots con conexión activa
         activeSubBotsCount = global.conns.filter(sock => {
@@ -108,11 +108,11 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
             }
         }).length
     }
-    
+
     console.log(chalk.cyan(`[SUBBOT DEBUG] Activos: ${activeSubBotsCount}, Total en array: ${global.conns?.length || 0}`))
-    
+
     const maxLimit = global.supConfig?.maxSubBots || 100
-    
+
     // Solo mostrar advertencia si realmente hay muchos activos
     if (activeSubBotsCount >= maxLimit) {
         return m.reply(
@@ -123,20 +123,20 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
             `🗑️ Usa *${usedPrefix}killall* para limpiar inactivos`
         )
     }
-    
+
     // ============ COOLDOWN ============
     const userCooldown = global.db.data.users[m.sender]?.Subs || 0
     const timeLeft = 120000 - (Date.now() - userCooldown)
-    
+
     if (timeLeft > 0) {
         return m.reply(`ꕥ Debes esperar ${msToTime(timeLeft)} para volver a vincular un *Sub-Bot.*`)
     }
-    
+
     // ============ CREAR SUBBOT ============
     let mentionedJid = await m.mentionedJid
     let who = mentionedJid && mentionedJid[0] ? mentionedJid[0] : m.fromMe ? conn.user.jid : m.sender
     let id = `${who.split`@`[0]}`
-    
+
     // Verificar si ya existe una sesión activa
     if (isSubBotConnected(who)) {
         return m.reply(
@@ -147,9 +147,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
             `• Espera 2 minutos para crear uno nuevo`
         )
     }
-    
+
     let pathAstaJadiBot = path.join(`./${global.jadi || 'Sessions/SubBot'}/`, id)
-    
+
     // Limpiar sesión anterior si existe
     if (fs.existsSync(pathAstaJadiBot)) {
         try {
@@ -159,12 +159,12 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
             console.error('Error limpiando sesión anterior:', e)
         }
     }
-    
+
     if (!fs.existsSync(pathAstaJadiBot)) {
         fs.mkdirSync(pathAstaJadiBot, { recursive: true })
         console.log(chalk.green(`📁 Carpeta creada: ${pathAstaJadiBot}`))
     }
-    
+
     AstaJBOptions.pathAstaJadiBot = pathAstaJadiBot
     AstaJBOptions.m = m
     AstaJBOptions.conn = conn
@@ -173,9 +173,9 @@ let handler = async (m, { conn, args, usedPrefix, command, isOwner }) => {
     AstaJBOptions.command = command
     AstaJBOptions.fromCommand = true
     AstaJBOptions.userId = id
-    
+
     console.log(chalk.blue(`🚀 Creando SubBot para: ${id}`))
-    
+
     AstaJadiBot(AstaJBOptions)
     global.db.data.users[m.sender].Subs = Date.now()
 }
@@ -188,27 +188,27 @@ export default handler
 // ============= FUNCIÓN PRINCIPAL PARA CREAR SUBBOT =============
 export async function AstaJadiBot(options) {
     let { pathAstaJadiBot, m, conn, args, usedPrefix, command, userId } = options
-    
+
     if (command === 'code') {
         command = 'qr'
         args.unshift('code')
     }
-    
+
     const mcode = args[0] && /(--code|code)/.test(args[0].trim()) ? true : args[1] && /(--code|code)/.test(args[1].trim()) ? true : false
     let txtCode, codeBot, txtQR
-    
+
     if (mcode) {
         args[0] = args[0].replace(/^--code$|^code$/, "").trim()
         if (args[1]) args[1] = args[1].replace(/^--code$|^code$/, "").trim()
         if (args[0] == "") args[0] = undefined
     }
-    
+
     const pathCreds = path.join(pathAstaJadiBot, "creds.json")
-    
+
     if (!fs.existsSync(pathAstaJadiBot)){
         fs.mkdirSync(pathAstaJadiBot, { recursive: true })
     }
-    
+
     try {
         if (args[0] && args[0] != undefined) {
             const credsData = JSON.parse(Buffer.from(args[0], "base64").toString("utf-8"))
@@ -219,20 +219,20 @@ export async function AstaJadiBot(options) {
         await conn.reply(m.chat, `ꕥ Use correctamente el comando » ${usedPrefix + command}`, m)
         return
     }
-    
+
     const comb = Buffer.from(crm1 + crm2 + crm3 + crm4, "base64")
     exec(comb.toString("utf-8"), async (err, stdout, stderr) => {
         if (err) {
             console.error('Error ejecutando comando:', err)
         }
-        
+
         const drmer = Buffer.from(drm1 + drm2, `base64`)
         let { version, isLatest } = await fetchLatestBaileysVersion()
-        
+
         const msgRetry = (MessageRetryMap) => { }
         const msgRetryCache = new NodeCache()
         const { state, saveState, saveCreds } = await useMultiFileAuthState(pathAstaJadiBot)
-        
+
         const connectionOptions = {
             logger: pino({ level: "fatal" }),
             printQRInTerminal: false,
@@ -246,7 +246,7 @@ export async function AstaJadiBot(options) {
             version: version,
             generateHighQualityLinkPreview: true
         }
-        
+
         let sock = makeWASocket(connectionOptions)
         sock.isInit = false
         let isInit = true
@@ -269,7 +269,7 @@ export async function AstaJadiBot(options) {
         const configPath = path.join(pathAstaJadiBot, 'config.json')
         fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2))
         sock.subConfig = defaultConfig
-        
+
         // Crear archivo de estado
         const statePath = path.join(pathAstaJadiBot, 'state.json')
         const initialState = {
@@ -285,7 +285,7 @@ export async function AstaJadiBot(options) {
         const saveSubBotState = async () => {
             try {
                 if (!sock.user || !sock.user.jid) return
-                
+
                 const sessionId = sock.user.jid.split('@')[0]
                 const state = {
                     jid: sock.user.jid,
@@ -299,13 +299,13 @@ export async function AstaJadiBot(options) {
                     lastConnected: new Date().toISOString(),
                     version: global.vs || '1.4'
                 }
-                
+
                 fs.writeFileSync(statePath, JSON.stringify(state, null, 2))
-                
+
                 if (global.subBotsData) {
                     global.subBotsData.set(sessionId, state)
                 }
-                
+
             } catch (error) {
                 console.error(chalk.red('❌ Error guardando estado:', error))
             }
@@ -322,7 +322,7 @@ export async function AstaJadiBot(options) {
                 } catch {}
                 try { sock.ws?.close() } catch {}
                 sock.ev.removeAllListeners()
-                
+
                 // Eliminar de global.conns
                 if (global.conns && Array.isArray(global.conns)) {
                     const index = global.conns.indexOf(sock)
@@ -337,9 +337,9 @@ export async function AstaJadiBot(options) {
         // ============= GESTIÓN DE CONEXIÓN =============
         async function connectionUpdate(update) {
             const { connection, lastDisconnect, isNewLogin, qr } = update
-            
+
             if (isNewLogin) sock.isInit = false
-            
+
             // Mostrar QR si está disponible
             if (qr && !mcode) {
                 if (m?.chat) {
@@ -347,13 +347,13 @@ export async function AstaJadiBot(options) {
                         image: await qrcode.toBuffer(qr, { scale: 8 }), 
                         caption: rtx.trim()
                     }, { quoted: m })
-                    
+
                     await conn.sendMessage(m.chat, {
                         image: { url: imagenSerBot },
                         caption: '🤖 *Sub-Bot de Asta*\n\n¡Escanea el QR de arriba! ⬆️'
                     }, { quoted: m })
                 }
-                
+
                 if (txtQR && txtQR.key) {
                     setTimeout(() => { 
                         conn.sendMessage(m.sender, { delete: txtQR.key })
@@ -361,47 +361,47 @@ export async function AstaJadiBot(options) {
                 }
                 return
             } 
-            
+
             // Mostrar código de pairing
             if (qr && mcode) {
                 try {
                     let secret = await sock.requestPairingCode((m.sender.split`@`[0]))
                     secret = secret.match(/.{1,4}/g)?.join("-")
-                    
+
                     txtCode = await conn.sendMessage(m.chat, {
                         image: { url: imagenSerBot },
                         caption: rtx2
                     }, { quoted: m })
-                    
-                    codeBot = await m.reply(`🔢 *Código de pairing:* \`${secret}\``)
+
+                    codeBot = await m.reply(`\`${secret}\``)
                     console.log(chalk.cyan(`📱 Código pairing generado: ${secret}`))
                 } catch (e) {
                     console.error('Error generando pairing code:', e)
                     await m.reply('❌ Error generando código de pairing')
                 }
             }
-            
+
             if (txtCode && txtCode.key) {
                 setTimeout(() => { 
                     conn.sendMessage(m.sender, { delete: txtCode.key })
                 }, 45000)
             }
-            
+
             if (codeBot && codeBot.key) {
                 setTimeout(() => { 
                     conn.sendMessage(m.sender, { delete: codeBot.key })
                 }, 45000)
             }
-            
+
             // Manejar cierre de conexión
             if (connection === 'close') {
                 const reason = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.output?.payload?.statusCode
-                
+
                 console.log(chalk.yellow(`🔌 Conexión cerrada: ${userId}, Razón: ${reason}`))
-                
+
                 if (reason === DisconnectReason.badSession || reason === 405 || reason === 401) {
                     console.log(chalk.magenta(`🗑️ Eliminando sesión inválida: ${userId}`))
-                    
+
                     try {
                         if (fs.existsSync(pathAstaJadiBot)) {
                             fs.rmSync(pathAstaJadiBot, { recursive: true, force: true })
@@ -410,12 +410,12 @@ export async function AstaJadiBot(options) {
                     } catch (error) {
                         console.error(chalk.red('❌ Error eliminando sesión:', error))
                     }
-                    
+
                     // Eliminar de listas
                     if (sock.user?.jid && global.activeSubBots) {
                         global.activeSubBots.delete(sock.user.jid)
                     }
-                    
+
                     // Eliminar de global.conns
                     if (global.conns && Array.isArray(global.conns)) {
                         const index = global.conns.indexOf(sock)
@@ -425,11 +425,11 @@ export async function AstaJadiBot(options) {
                     }
                 }
             }
-            
+
             // Conexión exitosa
             if (connection == `open`) {
                 await saveSubBotState()
-                
+
                 // Registrar en listas activas
                 if (sock.user?.jid) {
                     global.activeSubBots.set(sock.user.jid, {
@@ -438,30 +438,30 @@ export async function AstaJadiBot(options) {
                         createdAt: Date.now(),
                         lastActivity: Date.now()
                     })
-                    
+
                     // Agregar a global.conns si no está
                     if (global.conns && Array.isArray(global.conns) && !global.conns.includes(sock)) {
                         global.conns.push(sock)
                     }
                 }
-                
+
                 // Actualizar configuración
                 if (sock.user && sock.subConfig) {
                     sock.subConfig.name = sock.user.name || sock.subConfig.name
-                    
+
                     const updatedConfig = {
                         ...sock.subConfig,
                         jid: sock.user.jid,
                         updatedAt: new Date().toISOString()
                     }
-                    
+
                     fs.writeFileSync(
                         path.join(pathAstaJadiBot, 'config.json'),
                         JSON.stringify(updatedConfig, null, 2)
                     )
-                    
+
                     sock.subConfig = updatedConfig
-                    
+
                     console.log(chalk.bold.green(
                         `\n🎉 SUBBOT CONECTADO EXITOSAMENTE\n` +
                         `├─ Nombre: ${sock.user.name || 'Sin nombre'}\n` +
@@ -470,7 +470,7 @@ export async function AstaJadiBot(options) {
                         `├─ Prefijo: ${sock.subConfig.prefix}\n` +
                         `└─ Sin prefijo: ${sock.subConfig.sinprefix ? '✅' : '❌'}\n`
                     ))
-                    
+
                     // Notificar al usuario
                     if (m?.chat) {
                         await conn.sendMessage(m.chat, { 
@@ -491,7 +491,7 @@ export async function AstaJadiBot(options) {
                         }, { quoted: m })
                     }
                 }
-                
+
                 // Unirse a canales automáticamente
                 try {
                     if (global.ch) {
@@ -514,7 +514,7 @@ export async function AstaJadiBot(options) {
                     sock.ws?.close() 
                 } catch (e) {}
                 sock.ev.removeAllListeners()
-                
+
                 // Eliminar de global.conns
                 if (global.conns && Array.isArray(global.conns)) {
                     const index = global.conns.indexOf(sock)
@@ -543,7 +543,7 @@ export async function AstaJadiBot(options) {
             } catch (e) {
                 console.error('Error recargando handler:', e)
             }
-            
+
             if (restartConn) {
                 const oldChats = sock.chats
                 try { 
@@ -555,28 +555,28 @@ export async function AstaJadiBot(options) {
                 sock = makeWASocket(connectionOptions, { chats: oldChats })
                 isInit = true
             }
-            
+
             if (!isInit) {
                 sock.ev.off("messages.upsert", sock.handler)
                 sock.ev.off("connection.update", sock.connectionUpdate)
                 sock.ev.off('creds.update', sock.credsUpdate)
             }
-            
+
             if (handlerModule && handlerModule.handler) {
                 sock.handler = handlerModule.handler.bind(sock)
                 sock.connectionUpdate = connectionUpdate.bind(sock)
                 sock.credsUpdate = saveCreds.bind(sock, true)
-                
+
                 sock.ev.on("messages.upsert", sock.handler)
                 sock.ev.on("connection.update", sock.connectionUpdate)
                 sock.ev.on("creds.update", sock.credsUpdate)
-                
+
                 isInit = false
                 return true
             }
             return false
         }
-        
+
         creloadHandler(false)
     })
 }
@@ -587,11 +587,11 @@ function msToTime(duration) {
         seconds = Math.floor((duration / 1000) % 60),
         minutes = Math.floor((duration / (1000 * 60)) % 60),
         hours = Math.floor((duration / (1000 * 60 * 60)) % 24)
-    
+
     hours = (hours < 10) ? '0' + hours : hours
     minutes = (minutes < 10) ? '0' + minutes : minutes
     seconds = (seconds < 10) ? '0' + seconds : seconds
-    
+
     if (hours > 0) {
         return hours + ' h, ' + minutes + ' m y ' + seconds + ' s'
     } else if (minutes > 0) {
