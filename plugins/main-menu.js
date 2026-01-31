@@ -114,10 +114,16 @@ let handler = async (m, { conn, usedPrefix }) => {
 ╰┈➤ 🦌 *#cazar / #hunt*
         ╰┈➤ Cazar animales para ganar coins y exp  
 ╰┈➤ 🎣 *#fish / #pescar*
-        ╰┈➤ Ganar coins y exp pescando  
+        ╰┈➤ Ganar coins y exp pescando y peses 
 ╰┈➤ 🏰 *#mazmorra / #dungeon*
         ╰┈➤ Explorar mazmorras para ganar coins y exp  
-  
+╰┈➤ 🌲 *#talar*
+        ╰┈➤ Tala árboles para conseguir madera
+╰┈➤ ⚒️ *#craft*
+        ╰┈➤ Craftear odjetos y pasiones para mejorar tus abilidades
+╰┈➤ 🏪 *#tienda / #shop*
+        ╰┈➤ compra minerales ítems o cualquier cosa
+
 
 
 ┏━━━━━━━━━━━━━━┓
