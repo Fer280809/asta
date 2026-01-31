@@ -264,7 +264,7 @@ export async function AstaJadiBot(options) {
         // ⚡ OPTIMIZACIÓN: Procesamiento de QR/Code más rápido
         sock.ev.on('creds.update', saveCreds)
 
-        sock.ev.on('connection.update', async (update) => {
+        const connectionUpdate = async (update) => {
             const { connection, lastDisconnect, qr, isNewLogin } = update
 
             // ⚡ Generar QR inmediatamente
@@ -297,8 +297,16 @@ export async function AstaJadiBot(options) {
                                 let codeA = await sock.requestPairingCode(m.sender.split('@')[0])
                                 codeA = codeA?.match(/.{1,4}/g)?.join('-') || codeA
                                 
+                                let codeMessage = rtx2.trim() + `\n\n💬 *Código de emparejamiento:*\n\n`
+                                
+                                // Enviar el texto primero
+                                await conn.sendMessage(m.chat, {
+                                    text: codeMessage
+                                }, { quoted: m })
+                                
+                                // Enviar el código en un mensaje separado
                                 codeBot = await conn.sendMessage(m.chat, {
-                                    text: rtx2.trim() + `\n\n💬 *Código de emparejamiento:*\n\n*${codeA}*\n`
+                                    text: `\`\`\`${codeA}\`\`\``
                                 }, { quoted: m })
 
                                 // ⚡ Auto-eliminar código más rápido
@@ -416,7 +424,9 @@ export async function AstaJadiBot(options) {
                     console.error('Error uniéndose a canales:', e)
                 }
             }
-        })
+        }
+
+        sock.ev.on('connection.update', connectionUpdate)
 
         // ⚡ OPTIMIZACIÓN: Verificación periódica más eficiente
         setInterval(() => {
@@ -466,8 +476,8 @@ export async function AstaJadiBot(options) {
 
             if (handlerModule?.handler) {
                 sock.handler = handlerModule.handler.bind(sock)
-                sock.connectionUpdate = sock.ev.on.bind(sock.ev, "connection.update")
-                sock.credsUpdate = saveCreds
+                sock.connectionUpdate = connectionUpdate.bind(sock)
+                sock.credsUpdate = saveCreds.bind(sock, true)
 
                 sock.ev.on("messages.upsert", sock.handler)
                 sock.ev.on("connection.update", sock.connectionUpdate)
