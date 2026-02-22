@@ -8,6 +8,7 @@ import Pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import readline from 'readline'
 import { handler } from './lib/handler.js'
+import { onGroupUpdate } from './plugins/eventos/group-events.js'
 
 function question(q) {
   return new Promise((resolve) => {
@@ -35,7 +36,6 @@ async function start() {
   let usarQR = true
   let numeroGuardado = null
 
-  // ✅ Solo mostrar menú si NO hay sesión guardada y es la primera vez
   const sesionExiste = state.creds.registered || state.creds.me?.id
 
   if (!sesionExiste && !asked) {
@@ -57,7 +57,6 @@ async function start() {
       console.log('⏳ Conectando, espera el código...\n')
     }
   } else if (sesionExiste) {
-    // Sesión existente, reconectar silenciosamente
     console.log(`\n⏳ Reconectando ${global.namebot}...\n`)
   }
 
@@ -105,8 +104,6 @@ async function start() {
 
     if (connection === 'open') {
       console.log(`\n✅ ${global.namebot} conectado\n`)
-
-      // ✅ Enviar mensaje al propio número del bot
       try {
         const botId = sock.user?.id?.replace(/:.*@/, '@') || ''
         if (botId) {
@@ -131,6 +128,11 @@ async function start() {
 
   sock.ev.on('creds.update', saveCreds)
   sock.ev.on('messages.upsert', async (m) => await handler(sock, m))
+
+  // ✅ Listener de eventos de grupo
+  sock.ev.on('group-participants.update', async (update) => {
+    await onGroupUpdate(sock, update)
+  })
 }
 
 start().catch(console.error)
