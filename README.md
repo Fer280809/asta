@@ -159,19 +159,42 @@ tmux attach-session -t asta
 # Desconectar sin cerrar (Ctrl+B, luego D)
 ```
 
-### Paso 7: Actualizar el Bot
+### Paso 7: Actualizar el Bot (Automático)
 
+**Opción 1: Desde WhatsApp (Recomendado)**
+```
+.update
+```
+El bot se actualizará automáticamente y se reiniciará.
+
+**Opción 2: Script Manual en Termux**
 ```bash
 # Entrar al directorio del bot
 cd ~/storage/downloads/Asta
 
-# Descargar actualizaciones
-git pull origin main
+# Ejecutar script de actualización
+bash update.sh
 
-# Reinstalar dependencias si es necesario
-npm install
+# O manualmente:
+git pull origin main && npm install && npm start
+```
 
-# Reiniciar el bot
+### Paso 8: Reiniciar el Bot
+
+**Opción 1: Desde WhatsApp**
+```
+.restart
+```
+
+**Opción 2: En Termux**
+```bash
+# Si usas tmux:
+tmux kill-session -t asta
+
+# Luego reinicia:
+tmux new-session -d -s asta "cd ~/storage/downloads/Asta && npm start"
+
+# Si no usas tmux, presiona Ctrl+C y ejecuta:
 npm start
 ```
 
@@ -194,6 +217,13 @@ npm start
 | `.delete` | `.del` | Eliminar mensaje (responder) | Admin + Bot Admin |
 | `.revoke` | `.restablecer` | Revocar enlace del grupo | Admin + Bot Admin |
 
+### Comandos de Owner
+
+| Comando | Alias | Descripción |
+|---------|-------|-------------|
+| `.update` | `.actualizar` | Actualizar bot desde GitHub (automático) |
+| `.restart` | `.reiniciar` | Reiniciar el bot |
+
 ### Ejemplos de Uso
 
 ```
@@ -210,6 +240,8 @@ npm start
 .revoke                     # Revocar enlace
 .listnum 54                 # Listar números con prefijo +54
 .kicknum 55                 # Expulsar números con prefijo +55
+.update                     # Actualizar bot desde GitHub
+.restart                    # Reiniciar el bot
 ```
 
 ---
@@ -225,6 +257,7 @@ global.namebot = 'Asta Bot'           // Nombre del bot
 global.vs = '2.0.0'                   // Versión
 global.prefix = '.'                   // Prefijo de comandos
 global.libreria = 'Baileys Multi Device'
+```
 
 // Información del propietario
 global.owner = [
