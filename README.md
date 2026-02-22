@@ -16,8 +16,8 @@ Bot de WhatsApp avanzado con sistema de economía RPG, aventura, crafteo y SubBo
 
 ```bash
 # Clonar repositorio
-git clone https://github.com/Fer280809/Asta-bot.git
-cd asta-bot
+git clone https://github.com/Fer280809/Asta.git
+cd Asta
 
 # Instalar dependencias
 npm install
