@@ -1,3 +1,8 @@
+/**
+ * Code Recreated by Orion Wolf
+ *  * ║              Comando: kicknum.js                            ║
+ */
+
 // Sistema para iniciar/parar el comando kicknum
 global.kicknumRunning = global.kicknumRunning || {}
 

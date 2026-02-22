@@ -1,3 +1,8 @@
+/**
+ * Code Recreated by Orion Wolf
+ *  * ║              Comando: unmute.js                             ║
+ */
+
 export async function handler(conn, chat) {
   const m = chat.messages[0]
   if (!m?.message) return

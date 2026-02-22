@@ -1,3 +1,8 @@
+/**
+ * Code Recreated by Orion Wolf
+ * Comando: add.js - Invitar usuarios al grupo
+ */
+
 import moment from 'moment-timezone'
 
 export async function handler(conn, chat) {
