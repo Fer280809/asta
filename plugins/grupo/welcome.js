@@ -54,7 +54,6 @@ function setConfig(jid, datos) {
   guardarConfigs(configs)
 }
 
-// ✅ Normalizar participante — puede ser string u objeto {id}
 function getId(p) {
   return typeof p === 'string' ? p : p?.id || ''
 }
@@ -83,7 +82,7 @@ async function generarImagen(nombre, nombreGrupo, miembros, fotoPerfil, fotoGrup
   const canvas = createCanvas(cfg.width, cfg.height)
   const ctx    = canvas.getContext('2d')
 
-  // Fondo: foto del grupo con overlay oscuro
+  // Fondo
   if (fotoGrupo) {
     try {
       const bg = await loadImage(fotoGrupo)
@@ -99,7 +98,7 @@ async function generarImagen(nombre, nombreGrupo, miembros, fotoPerfil, fotoGrup
     ctx.fillRect(0, 0, cfg.width, cfg.height)
   }
 
-  // Línea decorativa
+  // Línea
   if (cfg.linea.activa) {
     ctx.strokeStyle = cfg.linea.color
     ctx.lineWidth   = 2
@@ -109,7 +108,7 @@ async function generarImagen(nombre, nombreGrupo, miembros, fotoPerfil, fotoGrup
     ctx.stroke()
   }
 
-  // Avatar circular
+  // Avatar
   const { x, y, radio, borde } = cfg.avatar
   ctx.save()
   ctx.beginPath()
@@ -174,12 +173,30 @@ export async function welcomeEvento(conn, jid, participants, metadata) {
       const numero     = usuario.split('@')[0]
       const fotoPerfil = await getFotoPerfil(conn, usuario)
       const imagen     = await generarImagen(`+${numero}`, nombreGrupo, miembros, fotoPerfil, fotoGrupo, cfg)
-      const caption    = cfg.caption
+
+      const caption = cfg.caption
         .replace('{numero}', numero)
         .replace('{grupo}', nombreGrupo)
         .replace('{miembros}', miembros)
 
-      await conn.sendMessage(jid, { image: imagen, caption, mentions: [usuario] })
+      // ✅ Imagen con estilo canal
+      await conn.sendMessage(jid, {
+        image: imagen,
+        caption,
+        contextInfo: {
+          externalAdReply: {
+            title: global.namebot,
+            body: global.firma || '',
+            thumbnail: fotoPerfil || Buffer.alloc(0),
+            mediaType: 1,
+            renderLargerThumbnail: false,
+            showAdAttribution: false,
+            sourceUrl: global.channel || 'https://whatsapp.com/channel/https://whatsapp.com/channel/0029VbAoYE99hXF1wm3zmQ21'
+          }
+        },
+        mentions: [usuario]
+      })
+
     } catch (err) {
       console.error('Error welcome usuario:', err.message)
     }
@@ -191,17 +208,38 @@ export async function byeEvento(conn, jid, participants, metadata) {
   if (!cfg.activo) return
 
   const nombreGrupo = metadata.subject
+  const fotoGrupo   = await getFotoGrupo(conn, jid)
 
   for (const p of participants) {
     try {
-      const usuario = getId(p)
+      const usuario    = getId(p)
       if (!usuario) continue
-      const numero  = usuario.split('@')[0]
+      const numero     = usuario.split('@')[0]
+      const fotoPerfil = await getFotoPerfil(conn, usuario)
+
       const caption = cfg.captionBye
         .replace('{numero}', numero)
         .replace('{grupo}', nombreGrupo)
 
-      await conn.sendMessage(jid, { text: caption, mentions: [usuario] })
+      // ✅ Mensaje estilo canal con foto como preview grande
+      await conn.sendMessage(jid, {
+        extendedTextMessage: {
+          text: caption,
+          contextInfo: {
+            externalAdReply: {
+              title: `👋 ${nombreGrupo}`,
+              body: global.namebot,
+              thumbnail: fotoPerfil || fotoGrupo || Buffer.alloc(0),
+              mediaType: 1,
+              renderLargerThumbnail: true,
+              showAdAttribution: false,
+              sourceUrl: global.channel || 'https://whatsapp.com/channel/https://whatsapp.com/channel/0029VbAoYE99hXF1wm3zmQ21'
+            }
+          }
+        },
+        mentions: [usuario]
+      })
+
     } catch (err) {
       console.error('Error bye usuario:', err.message)
     }
