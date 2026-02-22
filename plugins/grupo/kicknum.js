@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: kicknum.js                            ║
+ * Comando: kicknum.js - Expulsar por código de país
  */
 
 // Sistema para iniciar/parar el comando kicknum

@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: mute.js                               ║
+ * Comando: mute.js - Silenciar usuarios del grupo
  */
 
 export async function handler(conn, chat) {

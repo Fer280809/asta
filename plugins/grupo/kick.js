@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: kick.js                               ║
+ * Comando: kick.js - Expulsar usuarios del grupo
  */
 
 export async function handler(conn, chat) {

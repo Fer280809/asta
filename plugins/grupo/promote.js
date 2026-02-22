@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: promote.js                            ║
+ * Comando: promote.js - Promover administrador del grupo
  */
 
 export async function handler(conn, chat) {

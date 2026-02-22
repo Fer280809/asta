@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: unmute.js                             ║
+ * Comando: unmute.js - Desmuteador usuarios del grupo
  */
 
 export async function handler(conn, chat) {

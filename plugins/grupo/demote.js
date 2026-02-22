@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: demote.js                             ║
+ * Comando: demote.js - Degradar administrador del grupo
  */
 
 export async function handler(conn, chat) {

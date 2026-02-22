@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: delete.js                             ║
+ * Comando: delete.js - Eliminar mensajes del grupo
  */
 
 export async function handler(conn, chat) {

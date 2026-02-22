@@ -1,6 +1,6 @@
 /**
  * Code Recreated by Orion Wolf
- *  * ║              Comando: revoke.js                             ║
+ * Comando: revoke.js - Revocar y restablecer enlace del grupo
  */
 
 export async function handler(conn, chat) {
