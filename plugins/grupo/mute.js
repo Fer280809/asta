@@ -1,3 +1,20 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════╗
+ * ║                                                              ║
+ * ║   ██████╗ ███████╗ ██████╗ ██████╗ ███████╗███╗   ███╗      ║
+ * ║   ██╔══██╗██╔════╝██╔════╝██╔════╝██╔════╝████╗ ████║      ║
+ * ║   ██████╔╝█████╗  ██║     ██║     █████╗  ██╔████╔██║      ║
+ * ║   ██╔══██╗██╔══╝  ██║     ██║     ██╔══╝  ██║╚██╔╝██║      ║
+ * ║   ██║  ██║███████╗╚██████╗╚██████╗███████╗██║ ╚═╝ ██║      ║
+ * ║   ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝╚══════╝╚═╝     ╚═╝      ║
+ * ║                                                              ║
+ * ║              Code Recreated by Orion Wolf                   ║
+ * ║              Comando: mute.js                               ║
+ * ║              Descripción: Silenciar usuario del grupo       ║
+ * ║                                                              ║
+ * ╚══════════════════════════════════════════════════════════════╝
+ */
+
 export async function handler(conn, chat) {
   const m = chat.messages[0]
   if (!m?.message) return
@@ -113,13 +130,14 @@ export async function handler(conn, chat) {
     // Obtener nombre del usuario
     const userName = await conn.getName(user).catch(() => user.split('@')[0])
 
-    // Registrar el mute
+    // Registrar el mute con estado activo
     global.db.data.chats[from].mutes[user] = {
       mutedAt: Date.now(),
       mutedBy: sender,
       duration: duration,
       expiresAt: duration > 0 ? Date.now() + duration : null,
-      name: userName
+      name: userName,
+      active: true  // ✅ Campo para controlar si está activo
     }
 
     // Mensaje de confirmación
