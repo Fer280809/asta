@@ -13,11 +13,11 @@ global.owner = [
 ]
 
 // Enlaces
-global.channel = 'https://whatsapp.com/channel/XXXXXXXXXXXXXXXX'
+global.channel = 'https://whatsapp.com/channel/https://whatsapp.com/channel/0029VbAoYE99hXF1wm3zmQ21'
 
-global.grupo = 'https://chat.whatsapp.com/XXXXXXXXXXXXXXXX'
+global.grupo = 'https://chat.whatsapp.com/https://chat.whatsapp.com/CErS5aOt9Ws61C9UpFPzdC?mode=gi_t'
 
-global.comunidad = 'https://chat.whatsapp.com/XXXXXXXXXXXXXXXX'
+global.comunidad = 'https://chat.whatsapp.com/https://chat.whatsapp.com/KKwDZn5vDAE6MhZFAcVQeO'
 
 global.icono = 'https://raw.githubusercontent.com/Fer280809/Asta_bot/main/lib/catalogo.jpg'
 
