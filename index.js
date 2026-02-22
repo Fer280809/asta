@@ -22,9 +22,7 @@ function question(q) {
   })
 }
 
-// Limpia el número para cualquier país
 function limpiarNumero(numero) {
-  // Quita todo excepto dígitos
   return numero.replace(/[^0-9]/g, '')
 }
 
@@ -37,7 +35,10 @@ async function start() {
   let usarQR = true
   let numeroGuardado = null
 
-  if (!state.creds.registered && !asked) {
+  // ✅ Solo mostrar menú si NO hay sesión guardada y es la primera vez
+  const sesionExiste = state.creds.registered || state.creds.me?.id
+
+  if (!sesionExiste && !asked) {
     asked = true
 
     console.log(`\n╔════════════════════════════════════╗`)
@@ -50,33 +51,35 @@ async function start() {
 
     if (opcion.trim() === '1') {
       usarQR = false
-      const raw = await question('\n📞 Número con código de país (ej: 521XXXXXXXXXX, 1XXXXXXXXXX):\n> ')
+      const raw = await question('\n📞 Número con código de país (ej: 521XXXXXXXXXX):\n> ')
       numeroGuardado = limpiarNumero(raw)
       console.log(`\n✅ Número registrado: ${numeroGuardado}`)
       console.log('⏳ Conectando, espera el código...\n')
     }
+  } else if (sesionExiste) {
+    // Sesión existente, reconectar silenciosamente
+    console.log(`\n⏳ Reconectando ${global.namebot}...\n`)
   }
 
+  const logger = Pino({ level: 'fatal' })
+
   const sock = makeWASocket({
-    logger: Pino({ level: 'silent' }),
+    logger,
     auth: state,
     browser: [global.namebot, 'Chrome', global.vs],
     version,
     printQRInTerminal: false
   })
 
-  // Pedir código cuando el socket ya esté listo
-  if (!state.creds.registered && !usarQR && numeroGuardado) {
-    // Esperar a que el socket se conecte al servidor antes de pedir el código
+  if (!sesionExiste && !usarQR && numeroGuardado) {
     await new Promise((resolve) => {
-      const unsub = sock.ev.on('connection.update', (update) => {
-        // Cuando empieza a conectar ya podemos pedir el código
+      const listener = (update) => {
         if (update.connection === 'connecting' || update.qr) {
-          unsub()
+          sock.ev.off('connection.update', listener)
           resolve()
         }
-      })
-      // Timeout de seguridad por si no llega el evento
+      }
+      sock.ev.on('connection.update', listener)
       setTimeout(resolve, 5000)
     })
 
@@ -95,7 +98,7 @@ async function start() {
   sock.ev.on('connection.update', async (update) => {
     const { connection, qr, lastDisconnect } = update
 
-    if (qr && usarQR) {
+    if (qr && usarQR && !sesionExiste) {
       console.log('\n📷 Escanea el QR:')
       qrcode.generate(qr, { small: true })
     }
@@ -103,13 +106,15 @@ async function start() {
     if (connection === 'open') {
       console.log(`\n✅ ${global.namebot} conectado\n`)
 
-      for (let [numero] of global.owner) {
-        try {
-          await sock.sendMessage(`${numero}@s.whatsapp.net`, {
+      // ✅ Enviar mensaje al propio número del bot
+      try {
+        const botId = sock.user?.id?.replace(/:.*@/, '@') || ''
+        if (botId) {
+          await sock.sendMessage(botId, {
             text: `🤖 *${global.namebot}* en línea\n📅 ${new Date().toLocaleString()}`
           })
-        } catch {}
-      }
+        }
+      } catch {}
     }
 
     if (connection === 'close') {
