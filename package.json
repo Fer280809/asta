@@ -1,0 +1,15 @@
+{
+  "name": "asta-bot",
+  "version": "2.0.0",
+  "description": "Asta Bot - WhatsApp Bot",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "pino": "^9.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
