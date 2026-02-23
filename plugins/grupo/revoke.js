@@ -3,49 +3,32 @@
  * Comando: revoke.js - Revocar y restablecer enlace del grupo
  */
 
-export async function handler(conn, chat) {
-  const m = chat.messages[0]
-  if (!m?.message) return
-  
-  const from = m.key.remoteJid
-  const sender = m.key.participant || from
-  const isGroup = from.endsWith('@g.us')
-
-  if (!isGroup) return
-
-  const text =
-    m.message?.conversation ||
-    m.message?.extendedTextMessage?.text ||
-    ''
-
-  const command = text.trim().split(/\s+/)[0].toLowerCase().replace(global.prefix, '')
-
-  // Validar que sea comando de revoke
-  if (!['revoke', 'restablecer'].includes(command)) return
+let handler = async (m, { conn }) => {
+  if (!m.isGroup) return
 
   try {
     // Revocar el enlace anterior
-    await conn.groupRevokeInvite(from)
+    await conn.groupRevokeInvite(m.chat)
     
     // Obtener el nuevo código de invitación
-    const newCode = await conn.groupInviteCode(from)
+    const newCode = await conn.groupInviteCode(m.chat)
     const newLink = 'https://chat.whatsapp.com/' + newCode
 
     // Enviar el nuevo enlace al remitente
-    await conn.sendMessage(sender, { text: newLink })
+    await conn.sendMessage(m.sender, { text: newLink })
     
     // Confirmación en el grupo
-    conn.sendMessage(from, { text: `❀ Enlace del grupo revocado y restablecido correctamente.` }, { quoted: m })
+    conn.sendMessage(m.chat, { text: `❀ Enlace del grupo revocado y restablecido correctamente.` }, { quoted: m })
   } catch (e) {
-    conn.sendMessage(from, { text: `⚠️ Error: ${e.message}` }, { quoted: m })
+    conn.sendMessage(m.chat, { text: `⚠️ Error: ${e.message}` }, { quoted: m })
   }
 }
 
-export const config = {
-  help: ['revoke'],
-  tags: ['group'],
-  command: ['revoke', 'restablecer'],
-  group: true,
-  admin: true,
-  botAdmin: true
-}
+handler.help = ['revoke']
+handler.tags = ['group']
+handler.command = ['revoke', 'restablecer']
+handler.group = true
+handler.admin = true
+handler.botAdmin = true
+
+export default handler
