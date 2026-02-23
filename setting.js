@@ -1,4 +1,3 @@
-
 global.namebot = 'Asta Bot'
 global.vs = '2.0.0'
 global.prefix = '.'
@@ -7,17 +6,18 @@ global.libreria = 'Baileys Multi Device'
 global.dev = '𝕱𝖊𝖗𝖓𝖆𝖓𝖉𝖔'
 global.etiqueta = '𝕱𝖊𝖗𝖓𝖆𝖓𝖉𝖔'
 
+// Owners: pueden ser números o JIDs completos (incluyendo @lid)
 global.owner = [
-  ['5214183357841', '𝕱𝖊𝖗𝖓𝖆𝖓𝖉𝖔', true] // [número, nombre, isDev]
-  // ['1234567890', 'Admin', false]
+  ['43637555634392@lid', 'Dispositivo 1', true],
+  ['178485989523465@lid', 'Dispositivo 2', true]
 ]
 
 // Enlaces
-global.channel = 'https://whatsapp.com/channel/https://whatsapp.com/channel/0029VbAoYE99hXF1wm3zmQ21'
+global.channel = 'https://whatsapp.com/channel/0029VbAoYE99hXF1wm3zmQ21'
+global.IDchannel = '120363399175402285@newsletter'  // opcional
 
-global.grupo = 'https://chat.whatsapp.com/https://chat.whatsapp.com/CErS5aOt9Ws61C9UpFPzdC?mode=gi_t'
-
-global.comunidad = 'https://chat.whatsapp.com/https://chat.whatsapp.com/KKwDZn5vDAE6MhZFAcVQeO'
+global.grupo = 'https://chat.whatsapp.com/CErS5aOt9Ws61C9UpFPzdC'
+global.comunidad = 'https://chat.whatsapp.com/KKwDZn5vDAE6MhZFAcVQeO'
 
 global.icono = 'https://raw.githubusercontent.com/Fer280809/Asta_bot/main/lib/catalogo.jpg'
 
@@ -27,7 +27,7 @@ global.firma = '© Asta Bot - Todos los derechos reservados'
 global.modoPublico = true
 global.antiPrivado = false
 
-// Mensajes
+// Mensajes personalizados (usados por el handler)
 global.msj = {
   espera: '⏳ Procesando...',
   error: '❌ Error al ejecutar el comando',
