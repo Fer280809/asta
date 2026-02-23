@@ -9,7 +9,8 @@ global.etiqueta = '𝕱𝖊𝖗𝖓𝖆𝖓𝖉𝖔'
 // Owners: pueden ser números o JIDs completos (incluyendo @lid)
 global.owner = [
   ['43637555634392@lid', 'Dispositivo 1', true],
-  ['178485989523465@lid', 'Dispositivo 2', true]
+  ['178485989523465@lid', 'Dispositivo 2', true],
+  ['5214183357841', 'Fernando', true]
 ]
 
 // Enlaces
