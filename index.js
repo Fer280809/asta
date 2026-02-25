@@ -26,15 +26,7 @@ resolve(a)
 }
 
 function limpiarNumero(numero){
-
-let limpio=numero.replace(/[^0-9]/g,'')
-
-if(limpio.startsWith('521')){
-limpio='52'+limpio.slice(3)
-}
-
-return limpio
-
+return numero.replace(/[^0-9]/g,'')
 }
 
 async function verificarPlugins(){
@@ -44,45 +36,31 @@ const pluginsDir=path.join(process.cwd(),'plugins')
 let errores=0
 
 function buscar(dir){
-
 let archivos=[]
-
 if(!fs.existsSync(dir))return archivos
-
 for(const item of fs.readdirSync(dir)){
-
 const full=path.join(dir,item)
-
 if(fs.statSync(full).isDirectory()){
 archivos=archivos.concat(buscar(full))
 }else if(item.endsWith('.js')){
 archivos.push(full)
 }
-
 }
-
 return archivos
-
 }
 
 for(const file of buscar(pluginsDir)){
-
 try{
 await import(file)
 }catch{
 errores++
 }
-
 }
 
 if(errores){
-
 console.log(`⚠️ ${errores} plugins con error`)
-
 }else{
-
 console.log(`✅ Plugins cargados correctamente\n`)
-
 }
 
 }
@@ -90,11 +68,11 @@ console.log(`✅ Plugins cargados correctamente\n`)
 async function start(){
 
 const {state,saveCreds}=await useMultiFileAuthState('./session')
-
 const {version}=await fetchLatestBaileysVersion()
 
 let usarQR=true
 let numeroGuardado=null
+let pairingRequested=false
 
 const sesionExiste=
 Boolean(state.creds?.registered)&&
@@ -116,9 +94,7 @@ if(opcion==='1'){
 usarQR=false
 
 numeroGuardado=limpiarNumero(
-
 await question('\nNúmero con código país:\n> ')
-
 )
 
 console.log(`\nNúmero registrado: ${numeroGuardado}`)
@@ -134,22 +110,33 @@ console.log(`\nReconectando ${global.namebot}...\n`)
 await verificarPlugins()
 
 const sock=makeWASocket({
-
 auth:state,
 logger:Pino({level:'silent'}),
 browser:[global.namebot,'Chrome',global.vs],
 version,
 printQRInTerminal:false
-
 })
 
-if(!sesionExiste&&!usarQR&&numeroGuardado){
+sock.ev.on('connection.update',async(update)=>{
 
-setTimeout(async()=>{
+const {connection,qr,lastDisconnect}=update
+
+if(qr&&usarQR&&!sesionExiste){
+console.log('\nEscanea el QR:\n')
+qrcode.generate(qr,{small:true})
+}
+
+if(
+connection==='connecting' &&
+!pairingRequested &&
+!usarQR &&
+numeroGuardado &&
+!state.creds.registered
+){
+
+pairingRequested=true
 
 try{
-
-if(!state.creds.registered){
 
 const pairing=
 await sock.requestPairingCode(numeroGuardado)
@@ -162,27 +149,9 @@ console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
 console.log(`║ ${code}                            ║`)
 console.log(`╚════════════════════════════════════╝\n`)
 
-}
-
 }catch(e){
-
 console.log('Error obteniendo código:',e.message)
-
 }
-
-},3000)
-
-}
-
-sock.ev.on('connection.update',async(update)=>{
-
-const {connection,qr,lastDisconnect}=update
-
-if(qr&&usarQR&&!sesionExiste){
-
-console.log('\nEscanea el QR:\n')
-
-qrcode.generate(qr,{small:true})
 
 }
 
@@ -191,20 +160,13 @@ if(connection==='open'){
 console.log(`\n${global.namebot} conectado\n`)
 
 try{
-
 const botId=
 sock.user?.id?.replace(/:.*@/,'@')||''
-
 if(botId){
-
 await sock.sendMessage(botId,{
-
 text:`🤖 ${global.namebot} en línea\n${new Date().toLocaleString()}`
-
 })
-
 }
-
 }catch{}
 
 }
@@ -215,15 +177,11 @@ const reason=
 lastDisconnect?.error?.output?.statusCode
 
 if(reason===DisconnectReason.loggedOut){
-
 console.log('Sesión cerrada')
-
 process.exit(0)
-
 }
 
 console.log('Reconectando...')
-
 setTimeout(start,5000)
 
 }
@@ -244,3 +202,4 @@ async u=>await onGroupUpdate(sock,u)
 }
 
 start().catch(console.error)
+ 
