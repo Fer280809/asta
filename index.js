@@ -13,12 +13,13 @@ import fs from 'fs'
 import path from 'path'
 
 let pedirCode=false
-let numeroGuardado=null
+let codePedido=false
+let numero=null
 let usarQR=true
 
-function question(q){
+function ask(q){
 
-return new Promise(resolve=>{
+return new Promise(r=>{
 
 const rl=readline.createInterface({
 
@@ -27,10 +28,10 @@ output:process.stdout
 
 })
 
-rl.question(q,(answer)=>{
+rl.question(q,a=>{
 
 rl.close()
-resolve(answer)
+r(a)
 
 })
 
@@ -38,17 +39,17 @@ resolve(answer)
 
 }
 
-function limpiarNumero(numero){
+function limpiarNumero(n){
 
-let limpio=numero.replace(/[^0-9]/g,'')
+let num=n.replace(/[^0-9]/g,'')
 
-if(limpio.startsWith('521')){
+if(num.startsWith('521')){
 
-limpio='52'+limpio.slice(3)
+num='52'+num.slice(3)
 
 }
 
-return limpio
+return num
 
 }
 
@@ -58,43 +59,21 @@ const pluginsDir=path.join(process.cwd(),'plugins')
 
 let errores=0
 
-function buscar(dir){
+if(fs.existsSync(pluginsDir)){
 
-let archivos=[]
+for(const file of fs.readdirSync(pluginsDir)){
 
-if(!fs.existsSync(dir)) return archivos
-
-for(const item of fs.readdirSync(dir)){
-
-const full=path.join(dir,item)
-
-if(fs.statSync(full).isDirectory()){
-
-archivos=archivos.concat(buscar(full))
-
-}else if(item.endsWith('.js')){
-
-archivos.push(full)
-
-}
-
-}
-
-return archivos
-
-}
-
-const archivos=buscar(pluginsDir)
-
-for(const file of archivos){
+if(!file.endsWith('.js')) continue
 
 try{
 
-await import(file)
+await import(path.join(pluginsDir,file))
 
 }catch{
 
 errores++
+
+}
 
 }
 
@@ -118,7 +97,9 @@ const {state,saveCreds}=await useMultiFileAuthState('./session')
 
 const {version}=await fetchLatestBaileysVersion()
 
-const sesionExiste=state.creds.registered||state.creds.me?.id
+const sesionExiste=
+Boolean(state.creds?.registered)&&
+Boolean(state.creds?.me?.id)
 
 if(!sesionExiste){
 
@@ -129,18 +110,20 @@ console.log(`╚═════════════════════�
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const opcion=(await question('Opción (1 o 2): ')).trim()
+const op=(await ask('Opción (1 o 2): ')).trim()
 
-if(opcion==='1'){
+if(op==='1'){
 
 usarQR=false
 pedirCode=true
 
-numeroGuardado=limpiarNumero(
-await question('\nNúmero con código país:\n> ')
+numero=limpiarNumero(
+
+await ask('\nNúmero con código país:\n> ')
+
 )
 
-console.log(`\nNúmero registrado: ${numeroGuardado}`)
+console.log(`\nNúmero registrado: ${numero}`)
 
 }
 
@@ -168,25 +151,24 @@ const {connection,qr,lastDisconnect}=update
 
 if(qr&&usarQR&&!sesionExiste){
 
-console.log('\nEscanea el QR:\n')
+console.log('\nEscanea QR:\n')
 
 qrcode.generate(qr,{small:true})
 
 }
 
-if(pedirCode&&numeroGuardado){
+if(connection==='connecting'&&pedirCode&&!codePedido){
+
+codePedido=true
 
 try{
 
-const code=await sock.requestPairingCode(numeroGuardado)
+const code=await sock.requestPairingCode(numero)
 
 console.log(`\n╔════════════════════════════════════╗`)
 console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
 console.log(`║ ${code}                            ║`)
 console.log(`╚════════════════════════════════════╝\n`)
-
-pedirCode=false
-numeroGuardado=null
 
 }catch(e){
 
@@ -199,22 +181,6 @@ console.log('Error obteniendo código:',e.message)
 if(connection==='open'){
 
 console.log(`\n${global.namebot} conectado\n`)
-
-try{
-
-const botId=sock.user?.id?.replace(/:.*@/,'@')||''
-
-if(botId){
-
-await sock.sendMessage(botId,{
-
-text:`🤖 ${global.namebot} en línea\n${new Date().toLocaleString()}`
-
-})
-
-}
-
-}catch{}
 
 }
 
@@ -240,11 +206,15 @@ setTimeout(start,5000)
 
 sock.ev.on('creds.update',saveCreds)
 
-sock.ev.on('messages.upsert',async m=>await handler(sock,m))
+sock.ev.on('messages.upsert',async m=>{
 
-sock.ev.on('group-participants.update',async update=>{
+await handler(sock,m)
 
-await onGroupUpdate(sock,update)
+})
+
+sock.ev.on('group-participants.update',async u=>{
+
+await onGroupUpdate(sock,u)
 
 })
 
