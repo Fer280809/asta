@@ -9,16 +9,14 @@ import qrcode from 'qrcode-terminal'
 import readline from 'readline'
 import { handler } from './lib/handler.js'
 import { onGroupUpdate } from './plugins/eventos/group-events.js'
-import fs from 'fs'
-import path from 'path'
 
-let vinculando=false
+let pedirCode=false
 let numeroPair=null
 let usarQR=true
 
-function question(q){
+function ask(q){
 
-return new Promise(resolve=>{
+return new Promise(r=>{
 
 const rl=readline.createInterface({
 input:process.stdin,
@@ -28,7 +26,7 @@ output:process.stdout
 rl.question(q,a=>{
 
 rl.close()
-resolve(a)
+r(a)
 
 })
 
@@ -41,48 +39,12 @@ function limpiarNumero(n){
 let num=n.replace(/[^0-9]/g,'')
 
 if(num.startsWith('521')){
+
 num='52'+num.slice(3)
+
 }
 
 return num
-
-}
-
-async function verificarPlugins(){
-
-const pluginsDir=path.join(process.cwd(),'plugins')
-
-let errores=0
-
-if(fs.existsSync(pluginsDir)){
-
-for(const file of fs.readdirSync(pluginsDir)){
-
-if(!file.endsWith('.js')) continue
-
-try{
-
-await import(path.join(pluginsDir,file))
-
-}catch{
-
-errores++
-
-}
-
-}
-
-}
-
-if(errores){
-
-console.log(`⚠️ ${errores} plugins con error`)
-
-}else{
-
-console.log(`✅ Plugins cargados correctamente`)
-
-}
 
 }
 
@@ -103,15 +65,15 @@ console.log(`╚═════════════════════�
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const op=(await question('Opción (1 o 2): ')).trim()
+const op=(await ask('Opción (1 o 2): ')).trim()
 
 if(op==='1'){
 
 usarQR=false
-vinculando=true
+pedirCode=true
 
 numeroPair=limpiarNumero(
-await question('\nNúmero con código país:\n> ')
+await ask('\nNúmero con código país:\n> ')
 )
 
 console.log(`\nNúmero registrado: ${numeroPair}`)
@@ -120,14 +82,16 @@ console.log(`\nNúmero registrado: ${numeroPair}`)
 
 }
 
-await verificarPlugins()
-
 const sock=makeWASocket({
 
 auth:state,
+
 logger:Pino({level:'silent'}),
+
 browser:[global.namebot,'Chrome',global.vs],
+
 version,
+
 printQRInTerminal:false
 
 })
@@ -144,9 +108,7 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(connection==='connecting'){
-
-if(vinculando&&numeroPair){
+if(pedirCode&&numeroPair){
 
 try{
 
@@ -157,6 +119,7 @@ console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
 console.log(`║ ${code}                            ║`)
 console.log(`╚════════════════════════════════════╝\n`)
 
+pedirCode=false
 numeroPair=null
 
 }catch(e){
@@ -167,11 +130,7 @@ console.log('Error obteniendo código:',e.message)
 
 }
 
-}
-
 if(connection==='open'){
-
-vinculando=false
 
 console.log(`\n${global.namebot} conectado\n`)
 
@@ -189,17 +148,9 @@ process.exit(0)
 
 }
 
-if(vinculando){
-
-console.log('Esperando vinculación...')
-
-return
-
-}
-
 console.log('Reconectando...')
 
-setTimeout(start,4000)
+setTimeout(start,5000)
 
 }
 
