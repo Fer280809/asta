@@ -1,5 +1,5 @@
-// plugins/admin/kick.js
-// Expulsar miembros del grupo
+// plugins/admin/unmute.js
+// Quitar silencio a usuario
 
 let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin }) => {
   if (!m.isGroup) {
@@ -39,52 +39,39 @@ let handler = async (m, { conn, args, participants, isAdmin, isBotAdmin }) => {
 
   if (users.length === 0) {
     return conn.sendMessage(m.chat, {
-      text: `> . ﹡ ﹟ 👢 ׄ ⬭ *¡ᴇxᴘᴜʟsᴀʀ ᴍɪᴇᴍʙʀᴏ!*
+      text: `> . ﹡ ﹟ 🔊 ׄ ⬭ *¡ᴅᴇsɪʟᴇɴᴄɪᴀʀ!*
 
 *ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜📋* ㅤ֢ㅤ⸱ㅤᯭִ*
-ׅㅤ𓏸𓈒ㅤׄ *ᴜsᴏ* :: *.kick @usuario*
-ׅㅤ𓏸𓈒ㅤׄ *ɴᴜ́ᴍᴇʀᴏ* :: *.kick 521234567890*
-ׅㅤ𓏸𓈒ㅤׄ *ᴀʟɪᴀs* :: *.echar, .sacar, .ban*
+ׅㅤ𓏸𓈒ㅤׄ *ᴜsᴏ* :: *.unmute @usuario*
+ׅㅤ𓏸𓈒ㅤׄ *ᴀʟɪᴀs* :: *.dessilenciar*
 
 > ## \`ɴᴏᴛᴀ ⚔️\`
-> ɴᴏ sᴇ ᴘᴜᴇᴅᴇ ᴇxᴘᴜʟsᴀʀ ᴀᴅᴍɪɴs ɴɪ ᴀʟ ʙᴏᴛ`
-    }, { quoted: m })
-  }
-
-  let admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin').map(p => p.id)
-  let usersToKick = users.filter(id => !admins.includes(id) && id !== conn.user.jid)
-
-  if (usersToKick.length === 0) {
-    return conn.sendMessage(m.chat, {
-      text: `> . ﹡ ﹟ ❌ ׄ ⬭ *¡ɴᴏ ᴘᴇʀᴍɪᴛɪᴅᴏ!*
-
-*ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜⚠️* ㅤ֢ㅤ⸱ㅤᯭִ*
-ׅㅤ𓏸𓈒ㅤׄ *ᴍᴏᴛɪᴠᴏ* :: ɴᴏ sᴇ ᴘᴜᴇᴅᴇ ᴇxᴘᴜʟsᴀʀ ᴀᴅᴍɪɴs ɴɪ ᴀʟ ʙᴏᴛ`
+> ǫᴜɪᴛᴀ ᴇʟ sɪʟᴇɴᴄɪᴏ ᴅᴇ ᴜɴ ᴜsᴜᴀʀɪᴏ`
     }, { quoted: m })
   }
 
   let res = []
-  for (let user of usersToKick) {
+  for (let user of users) {
     try {
-      await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
-      res.push(`✅ @${user.split('@')[0]} ᴇxᴘᴜʟsᴀᴅᴏ`)
+      await conn.groupParticipantsUpdate(m.chat, [user], 'unrestrict')
+      res.push(`🔊 @${user.split('@')[0]} ʏᴀ ᴘᴜᴇᴅᴇ ʜᴀʙʟᴀʀ`)
     } catch (e) {
       res.push(`❌ ᴇʀʀᴏʀ ᴄᴏɴ @${user.split('@')[0]}`)
     }
   }
 
   conn.sendMessage(m.chat, {
-    text: `> . ﹡ ﹟ 👢 ׄ ⬭ *¡ᴍɪᴇᴍʙʀᴏs ᴇxᴘᴜʟsᴀᴅᴏs!*
+    text: `> . ﹡ ﹟ 🔊 ׄ ⬭ *¡sɪʟᴇɴᴄɪᴏ ʀᴇᴍᴏᴠɪᴅᴏ!*
 
 *ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜📊* ㅤ֢ㅤ⸱ㅤᯭִ*
 ${res.map(r => `ׅㅤ𓏸𓈒ㅤׄ ${r}`).join('\n')}`,
-    mentions: usersToKick
+    mentions: users
   }, { quoted: m })
 }
 
-handler.help = ['kick @usuario']
+handler.help = ['unmute @usuario']
 handler.tags = ['admin']
-handler.command = ['kick', 'expulsar', 'echar', 'sacar', 'ban']
+handler.command = ['unmute', 'dessilenciar']
 
 handler.group = true
 handler.admin = true
