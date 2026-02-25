@@ -15,7 +15,7 @@ global.owner = [
 
 // Enlaces
 global.channel = 'https://whatsapp.com/channel/0029VbAoYE99hXF1wm3zmQ21'
-global.IDchannel = '120363399175402285@newsletter'  // opcional
+global.IDchannel = '120363399175402285@newsletter'
 
 global.grupo = 'https://chat.whatsapp.com/CErS5aOt9Ws61C9UpFPzdC'
 global.comunidad = 'https://chat.whatsapp.com/KKwDZn5vDAE6MhZFAcVQeO'
@@ -35,7 +35,8 @@ global.msj = {
   sinPermisos: '🚫 No tienes permisos',
   soloOwner: '👑 Solo para owners',
   soloGrupo: '👥 Solo en grupos',
-  soloPrivado: '👤 Solo en privado'
+  soloPrivado: '👤 Solo en privado',
+  validcommand: '❌ Este comando *${cmd}* no exixte'
 }
 
 // Base de datos temporal
