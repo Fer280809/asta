@@ -13,94 +13,74 @@ import fs from 'fs'
 import path from 'path'
 
 let vinculando=false
+let numeroPair=null
+let usarQR=true
 
 function question(q){
+
 return new Promise(resolve=>{
+
 const rl=readline.createInterface({
 input:process.stdin,
 output:process.stdout
 })
-rl.question(q,(a)=>{
+
+rl.question(q,a=>{
+
 rl.close()
 resolve(a)
+
 })
+
 })
+
 }
 
-function limpiarNumero(numero){
+function limpiarNumero(n){
 
-let limpio=numero.replace(/[^0-9]/g,'')
+let num=n.replace(/[^0-9]/g,'')
 
-if(limpio.startsWith('521')){
-limpio='52'+limpio.slice(3)
+if(num.startsWith('521')){
+num='52'+num.slice(3)
 }
 
-return limpio
+return num
+
 }
 
 async function verificarPlugins(){
 
 const pluginsDir=path.join(process.cwd(),'plugins')
 
-function buscar(dir){
+let errores=0
 
-let archivos=[]
+if(fs.existsSync(pluginsDir)){
 
-if(!fs.existsSync(dir)) return archivos
+for(const file of fs.readdirSync(pluginsDir)){
 
-for(const item of fs.readdirSync(dir)){
-
-const full=path.join(dir,item)
-
-if(fs.statSync(full).isDirectory()){
-
-archivos=archivos.concat(buscar(full))
-
-}else if(item.endsWith('.js')){
-
-archivos.push(full)
-
-}
-
-}
-
-return archivos
-
-}
-
-const archivos=buscar(pluginsDir)
-
-const errores=[]
-
-for(const file of archivos){
+if(!file.endsWith('.js')) continue
 
 try{
 
-const mod=await import(file)
-
-const plugin=mod.default
-
-if(!plugin||typeof plugin!=='function'){
-
-errores.push(file)
-
-}
+await import(path.join(pluginsDir,file))
 
 }catch{
 
-errores.push(file)
+errores++
 
 }
 
 }
 
-if(errores.length){
+}
 
-console.log(`⚠️ ${errores.length} plugins con error`)
+if(errores){
+
+console.log(`⚠️ ${errores} plugins con error`)
 
 }else{
 
-console.log(`✅ Plugins cargados correctamente\n`)
+console.log(`✅ Plugins cargados correctamente`)
 
 }
 
@@ -111,9 +91,6 @@ async function start(){
 const {state,saveCreds}=await useMultiFileAuthState('./session')
 
 const {version}=await fetchLatestBaileysVersion()
-
-let usarQR=true
-let numero=null
 
 const sesionExiste=state.creds.registered||state.creds.me?.id
 
@@ -126,24 +103,20 @@ console.log(`╚═════════════════════�
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const opcion=(await question('Opción (1 o 2): ')).trim()
+const op=(await question('Opción (1 o 2): ')).trim()
 
-if(opcion==='1'){
+if(op==='1'){
 
 usarQR=false
 vinculando=true
 
-const raw=await question('\nNúmero con código país:\n> ')
+numeroPair=limpiarNumero(
+await question('\nNúmero con código país:\n> ')
+)
 
-numero=limpiarNumero(raw)
-
-console.log(`\nNúmero registrado: ${numero}`)
+console.log(`\nNúmero registrado: ${numeroPair}`)
 
 }
-
-}else{
-
-console.log(`\nReconectando ${global.namebot}...\n`)
 
 }
 
@@ -151,28 +124,40 @@ await verificarPlugins()
 
 const sock=makeWASocket({
 
-logger:Pino({level:'silent'}),
-
 auth:state,
-
+logger:Pino({level:'silent'}),
 browser:[global.namebot,'Chrome',global.vs],
-
 version,
-
 printQRInTerminal:false
 
 })
 
-if(!sesionExiste&&!usarQR&&numero){
+sock.ev.on('connection.update',async(update)=>{
+
+const {connection,qr,lastDisconnect}=update
+
+if(qr&&usarQR&&!sesionExiste){
+
+console.log('\nEscanea QR:\n')
+
+qrcode.generate(qr,{small:true})
+
+}
+
+if(connection==='connecting'){
+
+if(vinculando&&numeroPair){
 
 try{
 
-const code=await sock.requestPairingCode(numero)
+const code=await sock.requestPairingCode(numeroPair)
 
 console.log(`\n╔════════════════════════════════════╗`)
 console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
 console.log(`║ ${code}                            ║`)
 console.log(`╚════════════════════════════════════╝\n`)
+
+numeroPair=null
 
 }catch(e){
 
@@ -182,16 +167,6 @@ console.log('Error obteniendo código:',e.message)
 
 }
 
-sock.ev.on('connection.update',async(update)=>{
-
-const {connection,qr,lastDisconnect}=update
-
-if(qr&&usarQR&&!sesionExiste){
-
-console.log('\nEscanea el QR:\n')
-
-qrcode.generate(qr,{small:true})
-
 }
 
 if(connection==='open'){
@@ -199,22 +174,6 @@ if(connection==='open'){
 vinculando=false
 
 console.log(`\n${global.namebot} conectado\n`)
-
-try{
-
-const botId=sock.user?.id?.replace(/:.*@/,'@')||''
-
-if(botId){
-
-await sock.sendMessage(botId,{
-
-text:`🤖 ${global.namebot} en línea\n${new Date().toLocaleString()}`
-
-})
-
-}
-
-}catch{}
 
 }
 
@@ -240,11 +199,7 @@ return
 
 console.log('Reconectando...')
 
-setTimeout(()=>{
-
-start()
-
-},4000)
+setTimeout(start,4000)
 
 }
 
@@ -258,9 +213,9 @@ await handler(sock,m)
 
 })
 
-sock.ev.on('group-participants.update',async update=>{
+sock.ev.on('group-participants.update',async u=>{
 
-await onGroupUpdate(sock,update)
+await onGroupUpdate(sock,u)
 
 })
 
