@@ -35,48 +35,47 @@ const pluginsDir=path.join(process.cwd(),'plugins')
 
 let errores=0
 
-function buscar(dir){
-let archivos=[]
-if(!fs.existsSync(dir))return archivos
-for(const item of fs.readdirSync(dir)){
-const full=path.join(dir,item)
-if(fs.statSync(full).isDirectory()){
-archivos=archivos.concat(buscar(full))
-}else if(item.endsWith('.js')){
-archivos.push(full)
-}
-}
-return archivos
-}
+if(fs.existsSync(pluginsDir)){
 
-for(const file of buscar(pluginsDir)){
+for(const file of fs.readdirSync(pluginsDir)){
+
+if(!file.endsWith('.js')) continue
+
 try{
-await import(file)
+await import(path.join(pluginsDir,file))
 }catch{
 errores++
 }
+
+}
+
 }
 
 if(errores){
+
 console.log(`⚠️ ${errores} plugins con error`)
+
 }else{
+
 console.log(`✅ Plugins cargados correctamente\n`)
+
 }
 
 }
 
 async function start(){
 
-const {state,saveCreds}=await useMultiFileAuthState('./session')
-const {version}=await fetchLatestBaileysVersion()
+const {state,saveCreds}=
+await useMultiFileAuthState('./session')
+
+const {version}=
+await fetchLatestBaileysVersion()
 
 let usarQR=true
 let numeroGuardado=null
-let pairingRequested=false
 
-const sesionExiste=
-Boolean(state.creds?.registered)&&
-Boolean(state.creds?.me?.id)
+const sesionExiste =
+fs.existsSync('./session/creds.json')
 
 if(!sesionExiste){
 
@@ -87,13 +86,15 @@ console.log(`╚═════════════════════�
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const opcion=(await question('Opción (1 o 2): ')).trim()
+const opcion =
+(await question('Opción (1 o 2): ')).trim()
 
 if(opcion==='1'){
 
 usarQR=false
 
-numeroGuardado=limpiarNumero(
+numeroGuardado=
+limpiarNumero(
 await question('\nNúmero con código país:\n> ')
 )
 
@@ -101,87 +102,101 @@ console.log(`\nNúmero registrado: ${numeroGuardado}`)
 
 }
 
-}else{
-
-console.log(`\nReconectando ${global.namebot}...\n`)
-
 }
 
 await verificarPlugins()
 
-const sock=makeWASocket({
+const sock = makeWASocket({
+
 auth:state,
+
 logger:Pino({level:'silent'}),
-browser:[global.namebot,'Chrome',global.vs],
+
+browser:[
+global.namebot,
+'Chrome',
+global.vs
+],
+
 version,
+
 printQRInTerminal:false
+
 })
 
-sock.ev.on('connection.update',async(update)=>{
 
-const {connection,qr,lastDisconnect}=update
 
-if(qr&&usarQR&&!sesionExiste){
-console.log('\nEscanea el QR:\n')
-qrcode.generate(qr,{small:true})
-}
 
-if(
-connection==='connecting' &&
-!pairingRequested &&
-!usarQR &&
-numeroGuardado &&
-!state.creds.registered
-){
+if(!sesionExiste && !usarQR && numeroGuardado){
 
-pairingRequested=true
+setTimeout(async()=>{
 
 try{
 
-const pairing=
+if(!state.creds.registered){
+
+const pairing =
 await sock.requestPairingCode(numeroGuardado)
 
-const code=
-pairing?.match(/.{1,4}/g)?.join('-') || pairing
+const code =
+pairing.match(/.{1,4}/g).join('-')
 
 console.log(`\n╔════════════════════════════════════╗`)
 console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
 console.log(`║ ${code}                            ║`)
 console.log(`╚════════════════════════════════════╝\n`)
 
-}catch(e){
-console.log('Error obteniendo código:',e.message)
 }
+
+}catch(e){
+
+console.log(
+'Error obteniendo código:',
+e.message
+)
+
+}
+
+},2000)
+
+}
+
+
+sock.ev.on('connection.update',
+async({connection,qr,lastDisconnect})=>{
+
+if(qr&&usarQR&&!sesionExiste){
+
+console.log('\nEscanea QR:\n')
+
+qrcode.generate(qr,{small:true})
 
 }
 
 if(connection==='open'){
 
-console.log(`\n${global.namebot} conectado\n`)
-
-try{
-const botId=
-sock.user?.id?.replace(/:.*@/,'@')||''
-if(botId){
-await sock.sendMessage(botId,{
-text:`🤖 ${global.namebot} en línea\n${new Date().toLocaleString()}`
-})
-}
-}catch{}
+console.log(
+`\n${global.namebot} conectado\n`
+)
 
 }
 
 if(connection==='close'){
 
-const reason=
-lastDisconnect?.error?.output?.statusCode
+const reason =
+lastDisconnect?.error?.
+output?.statusCode
 
 if(reason===DisconnectReason.loggedOut){
+
 console.log('Sesión cerrada')
+
 process.exit(0)
+
 }
 
 console.log('Reconectando...')
+
 setTimeout(start,5000)
 
 }
@@ -190,7 +205,8 @@ setTimeout(start,5000)
 
 sock.ev.on('creds.update',saveCreds)
 
-sock.ev.on('messages.upsert',
+sock.ev.on(
+'messages.upsert',
 async m=>await handler(sock,m)
 )
 
@@ -202,4 +218,3 @@ async u=>await onGroupUpdate(sock,u)
 }
 
 start().catch(console.error)
- 
