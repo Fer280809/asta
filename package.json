@@ -1,5 +1,5 @@
 {
-  "name": "Asta",
+  "name": "asta",
   "version": "1.0.0",
   "description": "Asta WhatsApp Bot",
   "type": "module",
@@ -9,7 +9,7 @@
     "start": "node index.js"
   },
   "engines": {
-    "node": ">=18 <=22"
+    "node": ">=18"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.53",
@@ -20,6 +20,9 @@
     "node-fetch": "^3.3.2",
     "fs-extra": "^11.2.0",
     "moment-timezone": "^0.5.45",
-    "node-cache": "^5.1.2"
+    "node-cache": "^5.1.2",
+    "jimp": "^1.6.0",
+    "yt-search": "^2.12.0",
+    "axios": "^1.7.2"
   }
 }
