@@ -12,44 +12,28 @@ import { onGroupUpdate } from './plugins/eventos/group-events.js'
 import fs from 'fs'
 import path from 'path'
 
-let pedirCode=false
-let codePedido=false
-let numero=null
-let usarQR=true
-
-function ask(q){
-
-return new Promise(r=>{
-
+function question(q){
+return new Promise(resolve=>{
 const rl=readline.createInterface({
-
 input:process.stdin,
 output:process.stdout
-
 })
-
-rl.question(q,a=>{
-
+rl.question(q,(a)=>{
 rl.close()
-r(a)
-
+resolve(a)
 })
-
 })
-
 }
 
-function limpiarNumero(n){
+function limpiarNumero(numero){
 
-let num=n.replace(/[^0-9]/g,'')
+let limpio=numero.replace(/[^0-9]/g,'')
 
-if(num.startsWith('521')){
-
-num='52'+num.slice(3)
-
+if(limpio.startsWith('521')){
+limpio='52'+limpio.slice(3)
 }
 
-return num
+return limpio
 
 }
 
@@ -59,22 +43,34 @@ const pluginsDir=path.join(process.cwd(),'plugins')
 
 let errores=0
 
-if(fs.existsSync(pluginsDir)){
+function buscar(dir){
 
-for(const file of fs.readdirSync(pluginsDir)){
+let archivos=[]
 
-if(!file.endsWith('.js')) continue
+if(!fs.existsSync(dir))return archivos
 
-try{
+for(const item of fs.readdirSync(dir)){
 
-await import(path.join(pluginsDir,file))
+const full=path.join(dir,item)
 
-}catch{
-
-errores++
+if(fs.statSync(full).isDirectory()){
+archivos=archivos.concat(buscar(full))
+}else if(item.endsWith('.js')){
+archivos.push(full)
+}
 
 }
 
+return archivos
+
+}
+
+for(const file of buscar(pluginsDir)){
+
+try{
+await import(file)
+}catch{
+errores++
 }
 
 }
@@ -97,6 +93,9 @@ const {state,saveCreds}=await useMultiFileAuthState('./session')
 
 const {version}=await fetchLatestBaileysVersion()
 
+let usarQR=true
+let numeroGuardado=null
+
 const sesionExiste=
 Boolean(state.creds?.registered)&&
 Boolean(state.creds?.me?.id)
@@ -110,20 +109,19 @@ console.log(`╚═════════════════════�
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const op=(await ask('Opción (1 o 2): ')).trim()
+const opcion=(await question('Opción (1 o 2): ')).trim()
 
-if(op==='1'){
+if(opcion==='1'){
 
 usarQR=false
-pedirCode=true
 
-numero=limpiarNumero(
+numeroGuardado=limpiarNumero(
 
-await ask('\nNúmero con código país:\n> ')
+await question('\nNúmero con código país:\n> ')
 
 )
 
-console.log(`\nNúmero registrado: ${numero}`)
+console.log(`\nNúmero registrado: ${numeroGuardado}`)
 
 }
 
@@ -145,30 +143,26 @@ printQRInTerminal:false
 
 })
 
-sock.ev.on('connection.update',async(update)=>{
+if(!sesionExiste&&!usarQR&&numeroGuardado){
 
-const {connection,qr,lastDisconnect}=update
-
-if(qr&&usarQR&&!sesionExiste){
-
-console.log('\nEscanea QR:\n')
-
-qrcode.generate(qr,{small:true})
-
-}
-
-if(connection==='connecting'&&pedirCode&&!codePedido){
-
-codePedido=true
+setTimeout(async()=>{
 
 try{
 
-const code=await sock.requestPairingCode(numero)
+if(!state.creds.registered){
+
+const pairing=
+await sock.requestPairingCode(numeroGuardado)
+
+const code=
+pairing?.match(/.{1,4}/g)?.join('-') || pairing
 
 console.log(`\n╔════════════════════════════════════╗`)
 console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
 console.log(`║ ${code}                            ║`)
 console.log(`╚════════════════════════════════════╝\n`)
+
+}
 
 }catch(e){
 
@@ -176,17 +170,49 @@ console.log('Error obteniendo código:',e.message)
 
 }
 
+},3000)
+
+}
+
+sock.ev.on('connection.update',async(update)=>{
+
+const {connection,qr,lastDisconnect}=update
+
+if(qr&&usarQR&&!sesionExiste){
+
+console.log('\nEscanea el QR:\n')
+
+qrcode.generate(qr,{small:true})
+
 }
 
 if(connection==='open'){
 
 console.log(`\n${global.namebot} conectado\n`)
 
+try{
+
+const botId=
+sock.user?.id?.replace(/:.*@/,'@')||''
+
+if(botId){
+
+await sock.sendMessage(botId,{
+
+text:`🤖 ${global.namebot} en línea\n${new Date().toLocaleString()}`
+
+})
+
+}
+
+}catch{}
+
 }
 
 if(connection==='close'){
 
-const reason=lastDisconnect?.error?.output?.statusCode
+const reason=
+lastDisconnect?.error?.output?.statusCode
 
 if(reason===DisconnectReason.loggedOut){
 
@@ -206,17 +232,14 @@ setTimeout(start,5000)
 
 sock.ev.on('creds.update',saveCreds)
 
-sock.ev.on('messages.upsert',async m=>{
+sock.ev.on('messages.upsert',
+async m=>await handler(sock,m)
+)
 
-await handler(sock,m)
-
-})
-
-sock.ev.on('group-participants.update',async u=>{
-
-await onGroupUpdate(sock,u)
-
-})
+sock.ev.on(
+'group-participants.update',
+async u=>await onGroupUpdate(sock,u)
+)
 
 }
 
