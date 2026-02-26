@@ -1,5 +1,5 @@
 // plugins/gacha/gacha.js
-// Sistema de invocación con Safebooru API y Re-Roll
+// Sistema de invocación con Safebooru API
 import { getUser, updateUser } from '../../lib/economy.js'
 import fetch from 'node-fetch'
 
@@ -25,18 +25,18 @@ const BACKUP_WAIFUS = [
 // Costos de invocación
 const COSTS = {
   single: 100,
-  multi: 900,
-  reroll: 50 // Costo para re-rollear una waifu
+  multi: 900
 }
 
 let handler = async (m, { conn, args, command }) => {
   let userId = m.sender.split('@')[0]
   let user = getUser(userId)
   
-  // Verificar si es re-roll
-  let isReroll = command === 'reroll' || command === 'rw' || command === 'rer'
+  // Detectar tipo de invocación
   let isMulti = command === 'multigacha' || command === 'mgacha' || args[0] === '10'
-  let cost = isReroll ? COSTS.reroll : (isMulti ? COSTS.multi : COSTS.single)
+  let isRW = command === 'rw' || command === 'reroll' // rw hace lo mismo que gacha
+  
+  let cost = isMulti ? COSTS.multi : COSTS.single
   let rolls = isMulti ? 10 : 1
   
   // Verificar dinero
@@ -56,67 +56,7 @@ let handler = async (m, { conn, args, command }) => {
     }, { quoted: m })
   }
   
-  // Si es reroll, verificar que haya waifus pendientes
-  if (isReroll) {
-    global.gachaTemp = global.gachaTemp || {}
-    let pending = global.gachaTemp[userId]
-    
-    if (!pending || !pending.waifus || pending.waifus.length === 0) {
-      return conn.sendMessage(m.chat, {
-        text: `> . ﹡ ﹟ ❌ ׄ ⬭ *¡Nada para Re-Roll!*
-        
-No tienes waifus pendientes de reclamar.
-Usa .gacha primero.`,
-        mentions: [m.sender]
-      }, { quoted: m })
-    }
-    
-    // Re-rollear la última waifu o la especificada
-    let rerollIndex = parseInt(args[0]) - 1
-    if (isNaN(rerollIndex) || rerollIndex < 0 || rerollIndex >= pending.waifus.length) {
-      rerollIndex = pending.waifus.length - 1 // Por defecto la última
-    }
-    
-    // Guardar la waifu anterior para mostrar comparación
-    let oldWaifu = pending.waifus[rerollIndex]
-    
-    // Generar nueva waifu
-    let newWaifu = await summonWaifu()
-    
-    // Reemplazar en el array
-    pending.waifus[rerollIndex] = newWaifu
-    
-    // Descontar dinero
-    updateUser(userId, { balance: user.balance - cost })
-    
-    // Mostrar resultado del reroll
-    let text = `> . ﹡ ﹟ 🎲 ׄ ⬭ *¡ʀᴇ-ʀᴏʟʟ!*
-    
-*ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜💸* ㅤ֢ㅤ⸱ㅤᯭִ*
-ׅㅤ𓏸𓈒ㅤׄ *ᴄᴏsᴛᴏ* :: $${cost.toLocaleString()}
-*ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜🗑️* ㅤ֢ㅤ⸱ㅤᯭִ* (Anterior)
-ׅㅤ𓏸𓈒ㅤׄ *ɴᴏᴍʙʀᴇ* :: ${oldWaifu.name}
-ׅㅤ𓏸𓈒ㅤׄ *ʀᴀʀᴇᴢᴀ* :: ${oldWaifu.rarity.name}
-*ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜✨* ㅤ֢ㅤ⸱ㅤᯭִ* (Nueva)
-ׅㅤ𓏸𓈒ㅤׄ *ɴᴏᴍʙʀᴇ* :: ${newWaifu.name}
-ׅㅤ𓏸𓈒ㅤׄ *ʀᴀʀᴇᴢᴀ* :: ${newWaifu.rarity.name}
-ׅㅤ𓏸𓈒ㅤׄ *ᴠᴀʟᴏʀ* :: $${newWaifu.value.toLocaleString()}
-
-> ## \`ᴄᴏᴍᴀɴᴅᴏs ⚔️\`
-> • .claim - Reclamar esta waifu
-> • .reroll - Re-rollear otra vez ($50)
-> • .gacha - Nueva invocación`
-    
-    await conn.sendMessage(m.chat, {
-      image: { url: newWaifu.image },
-      caption: text,
-      mentions: [m.sender]
-    }, { quoted: m })
-    
-    return
-  }
-  
-  // Descontar dinero (gacha normal)
+  // Descontar dinero
   updateUser(userId, { balance: user.balance - cost })
   
   // Realizar invocaciones
@@ -133,7 +73,7 @@ Usa .gacha primero.`,
   if (isMulti) {
     await sendMultiResults(conn, m, results, cost, totalValue)
   } else {
-    await sendSingleResult(conn, m, results[0], cost)
+    await sendSingleResult(conn, m, results[0], cost, isRW)
   }
   
   // Guardar en inventario temporal para claim
@@ -153,7 +93,7 @@ async function summonWaifu() {
     
     // Intentar obtener de Safebooru con timeout
     let controller = new AbortController()
-    let timeout = setTimeout(() => controller.abort(), 5000) // 5 segundos timeout
+    let timeout = setTimeout(() => controller.abort(), 5000)
     
     let response = await fetch(`https://safebooru.org/index.php?page=dapi&s=post&q=index&json=1&limit=100&tags=${randomTag}_rating:general`, {
       signal: controller.signal
@@ -291,8 +231,11 @@ function extractSeries(tags) {
   return 'Serie Desconocida'
 }
 
-async function sendSingleResult(conn, m, waifu, cost) {
-  let text = `> . ﹡ ﹟ 🎲 ׄ ⬭ *¡ɪɴᴠᴏᴄᴀᴄɪᴏ́ɴ!*
+async function sendSingleResult(conn, m, waifu, cost, isRW = false) {
+  let title = isRW ? '¡ʀᴡ - ɴᴜᴇᴠᴀ ɪɴᴠᴏᴄᴀᴄɪᴏ́ɴ!' : '¡ɪɴᴠᴏᴄᴀᴄɪᴏ́ɴ!'
+  let cmdText = isRW ? '.rw - Invocar otra' : '.gacha - Invocar otra'
+  
+  let text = `> . ﹡ ﹟ 🎲 ׄ ⬭ *${title}*
   
 *ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜✨* ㅤ֢ㅤ⸱ㅤᯭִ*
 ׅㅤ𓏸𓈒ㅤׄ *ᴄᴏsᴛᴏ* :: $${cost.toLocaleString()}
@@ -305,8 +248,8 @@ async function sendSingleResult(conn, m, waifu, cost) {
 
 > ## \`ᴄᴏᴍᴀɴᴅᴏs ⚔️\`
 > • .claim - Reclamar esta waifu ($50)
-> • .reroll - Re-rollear ($50)
-> • .gacha - Invocar otra ($100)`
+> • ${cmdText} ($100)
+> • .multigacha - x10 invocaciones ($900)`
   
   await conn.sendMessage(m.chat, {
     image: { url: waifu.image },
@@ -340,8 +283,8 @@ ${waifus.map((w, i) => `${i + 1}. ${w.rarity.name.split(' ')[0]} ${w.name}`).joi
 > ## \`ᴄᴏᴍᴀɴᴅᴏs ⚔️\`
 > • .claim [número] - Reclamar específica
 > • .claimall - Reclamar todas
-> • .reroll [número] - Re-rollear una ($50)
-> • .gacha - Invocar de nuevo`
+> • .gacha - Invocar de nuevo
+> • .rw - Invocar rápido`
   
   // Enviar collage o primera imagen
   await conn.sendMessage(m.chat, {
@@ -361,8 +304,8 @@ ${waifus.map((w, i) => `${i + 1}. ${w.rarity.name.split(' ')[0]} ${w.name}`).joi
   }
 }
 
-handler.help = ['gacha', 'multigacha', 'mgacha', 'reroll', 'rw']
+handler.help = ['gacha', 'multigacha', 'mgacha', 'rw']
 handler.tags = ['gacha']
-handler.command = ['gacha', 'summon', 'roll', 'multigacha', 'mgacha', 'x10', 'reroll', 'rw', 'rer']
+handler.command = ['gacha', 'summon', 'roll', 'multigacha', 'mgacha', 'x10', 'rw', 'reroll']
 
 export default handler
