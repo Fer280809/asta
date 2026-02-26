@@ -1,79 +1,52 @@
-import './setting.js'
 import makeWASocket,{
 useMultiFileAuthState,
 fetchLatestBaileysVersion,
-DisconnectReason
+makeCacheableSignalKeyStore
 } from '@whiskeysockets/baileys'
 
 import Pino from 'pino'
-import qrcode from 'qrcode-terminal'
 import readline from 'readline'
-import fs from 'fs'
-import path from 'path'
-
+import qrcode from 'qrcode-terminal'
 import pkg from 'google-libphonenumber'
-const { PhoneNumberUtil } = pkg
-const phoneUtil = PhoneNumberUtil.getInstance()
 
-import { handler } from './lib/handler.js'
-import { onGroupUpdate } from './plugins/eventos/group-events.js'
+const {PhoneNumberUtil}=pkg
+const phoneUtil=PhoneNumberUtil.getInstance()
 
-function ask(q){
-return new Promise(r=>{
 const rl=readline.createInterface({
+
 input:process.stdin,
 output:process.stdout
+
 })
-rl.question(q,a=>{
-rl.close()
-r(a.trim())
+
+function ask(q){
+
+return new Promise(r=>{
+
+rl.question(q,a=>r(a.trim()))
+
 })
-})
+
 }
 
-function limpiarNumero(n){
-return n.replace(/\D/g,'')
-}
-
-async function numeroValido(numero){
+function validarNumero(n){
 
 try{
 
-if(!numero.startsWith('+'))
-numero='+'+numero
+if(!n.startsWith('+'))
+n='+'+n
 
-const parsed=
-phoneUtil.parseAndKeepRawInput(numero)
+return phoneUtil.isValidNumber(
 
-return phoneUtil.isValidNumber(parsed)
+phoneUtil.parseAndKeepRawInput(n)
+
+)
 
 }catch{
 
 return false
 
 }
-
-}
-
-async function verificarPlugins(){
-
-const dir=path.join(process.cwd(),'plugins')
-
-if(!fs.existsSync(dir)) return
-
-for(const f of fs.readdirSync(dir)){
-
-if(!f.endsWith('.js')) continue
-
-try{
-
-await import(path.join(dir,f))
-
-}catch{}
-
-}
-
-console.log('✅ Plugins cargados correctamente\n')
 
 }
 
@@ -85,131 +58,81 @@ await useMultiFileAuthState('./session')
 const {version}=
 await fetchLatestBaileysVersion()
 
-let usarQR=true
+console.log('1 Código')
+console.log('2 QR')
+
+let opcion=await ask('Opción:')
+
 let numero=null
 
-const sesionExiste=
-fs.existsSync('./session/creds.json')
-
-if(!sesionExiste){
-
-console.log(`\n${global.namebot} v${global.vs}\n`)
-
-console.log('1 Código')
-console.log('2 QR\n')
-
-const op=(await ask('Opción: ')).trim()
-
-if(op==='1'){
-
-usarQR=false
+if(opcion==='1'){
 
 do{
 
-numero=
-limpiarNumero(
-await ask('Número con país:\n> ')
-)
+numero=await ask('Número país:\n> ')
 
-}while(!(await numeroValido(numero)))
+}while(!validarNumero(numero))
 
-}
+numero=numero.replace(/\D/g,'')
 
 }
-
-await verificarPlugins()
 
 const sock=makeWASocket({
 
-auth:state,
+auth:{
+
+creds:state.creds,
+
+keys:makeCacheableSignalKeyStore(
+state.keys,
+Pino({level:'fatal'})
+)
+
+},
 
 logger:Pino({level:'silent'}),
 
-browser:[
-'AstaBot',
-'Edge',
-'20.0.04'
-],
+browser:['asta-MD','Edge','20.0.04'],
 
 version,
 
-mobile:false,
+printQRInTerminal:opcion==='2',
 
-printQRInTerminal:usarQR,
-
-markOnlineOnConnect:false
+mobile:false
 
 })
 
 sock.ev.on('connection.update',
+({qr})=>{
 
-({qr,connection,lastDisconnect})=>{
-
-if(qr && usarQR){
-
-console.log('\nEscanea QR:\n')
+if(qr && opcion==='2'){
 
 qrcode.generate(qr,{small:true})
 
 }
 
-if(connection==='open'){
-
-console.log(`${global.namebot} conectado`)
-
-}
-
-if(connection==='close'){
-
-const reason=
-lastDisconnect?.error?.
-output?.statusCode
-
-if(reason===DisconnectReason.loggedOut){
-
-console.log('Sesión cerrada')
-
-process.exit()
-
-}
-
-console.log('Reconectando...')
-
-setTimeout(start,4000)
-
-}
-
 })
 
-if(!usarQR && numero && !state.creds.registered){
+if(opcion==='1'
+&& !state.creds.registered){
 
-await new Promise(r=>setTimeout(r,4000))
+setTimeout(async()=>{
 
-const pairing=
+let code=
 await sock.requestPairingCode(numero)
 
-console.log('\n══════ CÓDIGO ══════')
+console.log('\nCódigo:\n')
 
 console.log(
-pairing.match(/.{1,4}/g).join('-')
+code.match(/.{1,4}/g).join('-')
 )
 
-console.log('════════════════════\n')
+},2000)
 
 }
 
 sock.ev.on('creds.update',saveCreds)
 
-sock.ev.on(
-'messages.upsert',
-m=>handler(sock,m)
-)
-
-sock.ev.on(
-'group-participants.update',
-u=>onGroupUpdate(sock,u)
-)
-
 }
 
-start().catch(console.error)
+start()
