@@ -12,9 +12,9 @@ import { onGroupUpdate } from './plugins/eventos/group-events.js'
 import fs from 'fs'
 import path from 'path'
 
-function question(q){
+function ask(q){
 
-return new Promise(resolve=>{
+return new Promise(r=>{
 
 const rl=readline.createInterface({
 
@@ -27,7 +27,7 @@ rl.question(q,a=>{
 
 rl.close()
 
-resolve(a)
+r(a)
 
 })
 
@@ -35,17 +35,9 @@ resolve(a)
 
 }
 
-function limpiarNumero(numero){
+function limpiarNumero(n){
 
-numero=numero.replace(/\D/g,'')
-
-if(numero.startsWith('521')){
-
-numero='52'+numero.slice(3)
-
-}
-
-return numero
+return n.replace(/\D/g,'')
 
 }
 
@@ -53,9 +45,7 @@ async function verificarPlugins(){
 
 const dir=path.join(process.cwd(),'plugins')
 
-let errores=0
-
-if(fs.existsSync(dir)){
+if(!fs.existsSync(dir)) return
 
 for(const f of fs.readdirSync(dir)){
 
@@ -65,22 +55,11 @@ try{
 
 await import(path.join(dir,f))
 
-}catch{
-
-errores++
+}catch{}
 
 }
 
-}
-
-}
-
-console.log(
-errores?
-`⚠️ ${errores} plugins con error`
-:
-`✅ Plugins cargados correctamente\n`
-)
+console.log('✅ Plugins cargados correctamente\n')
 
 }
 
@@ -94,21 +73,19 @@ await fetchLatestBaileysVersion()
 
 let usarQR=true
 let numero=null
-let pairingHecho=false
+let pairing=false
 
 const sesionExiste=
 fs.existsSync('./session/creds.json')
 
 if(!sesionExiste){
 
-console.log(`\n╔════════════════════╗`)
-console.log(`║ ${global.namebot} v${global.vs} ║`)
-console.log(`╚════════════════════╝\n`)
+console.log(`\n${global.namebot} v${global.vs}\n`)
 
-console.log('1. Vinculación por código')
-console.log('2. QR\n')
+console.log('1 Código')
+console.log('2 QR\n')
 
-const op=(await question('Opción: ')).trim()
+const op=(await ask('Opción: ')).trim()
 
 if(op==='1'){
 
@@ -116,10 +93,8 @@ usarQR=false
 
 numero=
 limpiarNumero(
-await question('\nNúmero con código país:\n> ')
+await ask('Número con país:\n> ')
 )
-
-console.log(`Número: ${numero}`)
 
 }
 
@@ -157,32 +132,32 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(connection==='connecting'
+if(connection==='open'
 && !usarQR
 && numero
-&& !pairingHecho
+&& !pairing
 && !state.creds.registered){
 
-pairingHecho=true
+pairing=true
 
 try{
 
-await new Promise(r=>setTimeout(r,5000))
-
-const pairing=
-await sock.requestPairingCode(numero)
+await new Promise(r=>setTimeout(r,4000))
 
 const code=
-pairing.match(/.{1,4}/g).join('-')
+await sock.requestPairingCode(numero)
 
-console.log(`\n╔════════════════════╗`)
-console.log(`║ CÓDIGO             ║`)
-console.log(`║ ${code}            ║`)
-console.log(`╚════════════════════╝\n`)
+console.log(`\n══════ CÓDIGO ══════`)
+
+console.log(
+code.match(/.{1,4}/g).join('-')
+)
+
+console.log(`════════════════════\n`)
 
 }catch(e){
 
-console.log('Error:',e.message)
+console.log('Error pairing:',e.message)
 
 }
 
@@ -190,7 +165,7 @@ console.log('Error:',e.message)
 
 if(connection==='open'){
 
-console.log(`\n${global.namebot} conectado\n`)
+console.log(`${global.namebot} conectado`)
 
 }
 
@@ -204,13 +179,13 @@ if(reason===DisconnectReason.loggedOut){
 
 console.log('Sesión cerrada')
 
-process.exit(0)
+process.exit()
 
 }
 
 console.log('Reconectando...')
 
-setTimeout(start,5000)
+setTimeout(start,4000)
 
 }
 
