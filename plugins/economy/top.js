@@ -59,8 +59,7 @@ let handler = async (m, { conn, args }) => {
   • ᴘʀᴏ́xɪᴍᴀ: ${formatNext(nextWeekly)}
 
 > ## \`ᴀᴜᴛᴏᴍᴀ́ᴛɪᴄᴏ ⚔️\`
-> ʟᴀs ʀᴇᴄᴏᴍᴘᴇɴsᴀs sᴇ ᴇɴᴠɪ́ᴀɴ ᴀᴜᴛᴏᴍᴀ́ᴛɪᴄᴀᴍᴇɴᴛᴇ ᴀʟ ʙᴀɴᴄᴏ`,
-      mentions: [m.sender]
+> ʟᴀs ʀᴇᴄᴏᴍᴘᴇɴsᴀs sᴇ ᴇɴᴠɪ́ᴀɴ ᴀᴜᴛᴏᴍᴀ́ᴛɪᴄᴀᴍᴇɴᴛᴇ ᴀʟ ʙᴀɴᴄᴏ`
     }, { quoted: m })
   }
 
@@ -71,13 +70,15 @@ let handler = async (m, { conn, args }) => {
 `
 
   for (let i = 0; i < top.length; i++) {
-    let user = top[i]
+    // ✅ Fix: usar solo el número, igual que balance.js con @${userId}
+    let topUser = top[i]
     let medal = medals[i] || `${i + 1}.`
-    text += `*ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜${medal}* ㅤ֢ㅤ⸱ㅤᯭִ* @${user.id}
+    // user.id ya viene sin @s.whatsapp.net desde getTop()
+    text += `*ㅤꨶ〆⁾ ㅤׄㅤ⸼ㅤׄ *͜${medal}* ㅤ֢ㅤ⸱ㅤᯭִ* @${topUser.id}
 `
-    text += `ׅㅤ𓏸𓈒ㅤׄ *ᴛᴏᴛᴀʟ* :: $${user.total.toLocaleString()}
+    text += `ׅㅤ𓏸𓈒ㅤׄ *ᴛᴏᴛᴀʟ* :: $${topUser.total.toLocaleString()}
 `
-    text += `ׅㅤ𓏸𓈒ㅤׄ *ɴɪᴠᴇʟ* :: ${user.level} ⭐ | *ᴇxᴘ* :: ${user.exp.toLocaleString()}
+    text += `ׅㅤ𓏸𓈒ㅤׄ *ɴɪᴠᴇʟ* :: ${topUser.level} ⭐ | *ᴇxᴘ* :: ${topUser.exp.toLocaleString()}
 
 `
   }
@@ -100,10 +101,8 @@ let handler = async (m, { conn, args }) => {
 > ᴇʟ ᴛᴏᴘ 3 ʀᴇᴄɪʙᴇ ʀᴇᴄᴏᴍᴘᴇɴsᴀs ᴀᴜᴛᴏᴍᴀ́ᴛɪᴄᴀs
 > ᴠᴇʀ: .top rewards`
 
-  let mentions = top.map(u => u.id + '@s.whatsapp.net')
-  if (userPos > 10) mentions.push(m.sender)
-
-  conn.sendMessage(m.chat, { text, mentions }, { quoted: m })
+  // ✅ Fix: sin mentions, solo texto plano con el número
+  conn.sendMessage(m.chat, { text }, { quoted: m })
 }
 
 handler.help = ['top', 'ranking', 'leaderboard']
