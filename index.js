@@ -73,7 +73,6 @@ await fetchLatestBaileysVersion()
 
 let usarQR=true
 let numero=null
-let pairingPedido=false
 
 const sesionExiste=
 fs.existsSync('./session/creds.json')
@@ -93,7 +92,7 @@ usarQR=false
 
 numero=
 limpiarNumero(
-await ask('Número con código país:\n> ')
+await ask('Número:\n> ')
 )
 
 }
@@ -121,10 +120,9 @@ printQRInTerminal:false
 })
 
 sock.ev.on('connection.update',
+({qr})=>{
 
-async({connection,qr,lastDisconnect})=>{
-
-if(qr && usarQR && !sesionExiste){
+if(qr && usarQR){
 
 console.log('\nEscanea QR:\n')
 
@@ -132,43 +130,37 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(
-connection==='connecting'
-&& !usarQR
-&& numero
-&& !pairingPedido
-&& !state.creds.registered
-){
+})
 
-pairingPedido=true
+if(!usarQR && numero && !state.creds.registered){
 
-try{
+await sock.waitForConnectionUpdate(
 
-await new Promise(r=>setTimeout(r,7000))
+u=>u.connection==='connecting'
+
+)
+
+await new Promise(r=>setTimeout(r,6000))
 
 const pairing=
 await sock.requestPairingCode(numero)
 
-const code=
+console.log('\n══════ CÓDIGO ══════')
+
+console.log(
 pairing.match(/.{1,4}/g).join('-')
+)
 
-console.log(`\n══════ CÓDIGO ══════`)
-
-console.log(code)
-
-console.log(`════════════════════\n`)
-
-}catch(e){
-
-console.log('Error obteniendo código:',e.message)
+console.log('════════════════════\n')
 
 }
 
-}
+sock.ev.on('connection.update',
+({connection,lastDisconnect})=>{
 
 if(connection==='open'){
 
-console.log(`\n${global.namebot} conectado\n`)
+console.log(`${global.namebot} conectado`)
 
 }
 
@@ -179,8 +171,6 @@ lastDisconnect?.error?.
 output?.statusCode
 
 if(reason===DisconnectReason.loggedOut){
-
-console.log('Sesión cerrada')
 
 process.exit()
 
@@ -198,12 +188,12 @@ sock.ev.on('creds.update',saveCreds)
 
 sock.ev.on(
 'messages.upsert',
-async m=>await handler(sock,m)
+m=>handler(sock,m)
 )
 
 sock.ev.on(
 'group-participants.update',
-async u=>await onGroupUpdate(sock,u)
+u=>onGroupUpdate(sock,u)
 )
 
 }
