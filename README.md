@@ -6,7 +6,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js->=18-brightgreen?style=flat-square&logo=node.js)](https://nodejs.org/)
 [![Baileys](https://img.shields.io/badge/Baileys-Multi%20Device-blue?style=flat-square&logo=whatsapp)](https://github.com/WhiskeySockets/Baileys)
-[![License](https://img.shields.io/badge/License-GLP-3.0-yellow?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/License-GLP-yellow?style=flat-square)](LICENSE)
 [![Estado](https://img.shields.io/badge/Estado-Activo-brightgreen?style=flat-square)](https://github.com/Fer280809/Asta)
 
 </div>
