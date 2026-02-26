@@ -73,7 +73,7 @@ await fetchLatestBaileysVersion()
 
 let usarQR=true
 let numero=null
-let pairing=false
+let pairingPedido=false
 
 const sesionExiste=
 fs.existsSync('./session/creds.json')
@@ -132,32 +132,33 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(connection==='open'
+if(qr
 && !usarQR
 && numero
-&& !pairing
+&& !pairingPedido
 && !state.creds.registered){
 
-pairing=true
+pairingPedido=true
 
 try{
 
-await new Promise(r=>setTimeout(r,4000))
+await new Promise(r=>setTimeout(r,5000))
+
+const pairing=
+await sock.requestPairingCode(numero)
 
 const code=
-await sock.requestPairingCode(numero)
+pairing.match(/.{1,4}/g).join('-')
 
 console.log(`\n══════ CÓDIGO ══════`)
 
-console.log(
-code.match(/.{1,4}/g).join('-')
-)
+console.log(code)
 
 console.log(`════════════════════\n`)
 
 }catch(e){
 
-console.log('Error pairing:',e.message)
+console.log('Error:',e.message)
 
 }
 
