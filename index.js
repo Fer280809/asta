@@ -13,60 +13,74 @@ import fs from 'fs'
 import path from 'path'
 
 function question(q){
+
 return new Promise(resolve=>{
+
 const rl=readline.createInterface({
+
 input:process.stdin,
 output:process.stdout
+
 })
+
 rl.question(q,a=>{
+
 rl.close()
+
 resolve(a)
+
 })
+
 })
+
 }
 
 function limpiarNumero(numero){
 
-numero = numero.replace(/[^0-9]/g,'')
+numero=numero.replace(/\D/g,'')
 
 if(numero.startsWith('521')){
+
 numero='52'+numero.slice(3)
+
 }
 
 return numero
+
 }
 
 async function verificarPlugins(){
 
-const pluginsDir=path.join(process.cwd(),'plugins')
+const dir=path.join(process.cwd(),'plugins')
 
 let errores=0
 
-if(fs.existsSync(pluginsDir)){
+if(fs.existsSync(dir)){
 
-for(const file of fs.readdirSync(pluginsDir)){
+for(const f of fs.readdirSync(dir)){
 
-if(!file.endsWith('.js')) continue
+if(!f.endsWith('.js')) continue
 
 try{
-await import(path.join(pluginsDir,file))
+
+await import(path.join(dir,f))
+
 }catch{
+
 errores++
-}
 
 }
 
 }
 
-if(errores){
-
-console.log(`⚠️ ${errores} plugins con error`)
-
-}else{
-
-console.log(`✅ Plugins cargados correctamente\n`)
-
 }
+
+console.log(
+errores?
+`⚠️ ${errores} plugins con error`
+:
+`✅ Plugins cargados correctamente\n`
+)
 
 }
 
@@ -79,34 +93,33 @@ const {version}=
 await fetchLatestBaileysVersion()
 
 let usarQR=true
-let numeroGuardado=null
-let codigoPedido=false
+let numero=null
+let pairingHecho=false
 
 const sesionExiste=
 fs.existsSync('./session/creds.json')
 
 if(!sesionExiste){
 
-console.log(`\n╔══════════════════════════════╗`)
+console.log(`\n╔════════════════════╗`)
 console.log(`║ ${global.namebot} v${global.vs} ║`)
-console.log(`╚══════════════════════════════╝\n`)
+console.log(`╚════════════════════╝\n`)
 
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const opcion=
-(await question('Opción (1 o 2): ')).trim()
+const op=(await question('Opción: ')).trim()
 
-if(opcion==='1'){
+if(op==='1'){
 
 usarQR=false
 
-numeroGuardado=
+numero=
 limpiarNumero(
 await question('\nNúmero con código país:\n> ')
 )
 
-console.log(`\nNúmero registrado: ${numeroGuardado}`)
+console.log(`Número: ${numero}`)
 
 }
 
@@ -114,7 +127,7 @@ console.log(`\nNúmero registrado: ${numeroGuardado}`)
 
 await verificarPlugins()
 
-const sock = makeWASocket({
+const sock=makeWASocket({
 
 auth:state,
 
@@ -133,6 +146,7 @@ printQRInTerminal:false
 })
 
 sock.ev.on('connection.update',
+
 async({connection,qr,lastDisconnect})=>{
 
 if(qr && usarQR && !sesionExiste){
@@ -143,26 +157,32 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(qr && !usarQR && !sesionExiste && numeroGuardado && !codigoPedido){
+if(connection==='connecting'
+&& !usarQR
+&& numero
+&& !pairingHecho
+&& !state.creds.registered){
 
-codigoPedido=true
+pairingHecho=true
 
 try{
 
+await new Promise(r=>setTimeout(r,5000))
+
 const pairing=
-await sock.requestPairingCode(numeroGuardado)
+await sock.requestPairingCode(numero)
 
 const code=
 pairing.match(/.{1,4}/g).join('-')
 
-console.log(`\n╔══════════════════════════════╗`)
-console.log(`║ CÓDIGO DE VINCULACIÓN        ║`)
-console.log(`║ ${code}                      ║`)
-console.log(`╚══════════════════════════════╝\n`)
+console.log(`\n╔════════════════════╗`)
+console.log(`║ CÓDIGO             ║`)
+console.log(`║ ${code}            ║`)
+console.log(`╚════════════════════╝\n`)
 
 }catch(e){
 
-console.log('Error obteniendo código:',e.message)
+console.log('Error:',e.message)
 
 }
 
@@ -200,12 +220,12 @@ sock.ev.on('creds.update',saveCreds)
 
 sock.ev.on(
 'messages.upsert',
-async m=>await handler(sock,m)
+m=>handler(sock,m)
 )
 
 sock.ev.on(
 'group-participants.update',
-async u=>await onGroupUpdate(sock,u)
+u=>onGroupUpdate(sock,u)
 )
 
 }
