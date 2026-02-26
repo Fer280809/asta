@@ -18,7 +18,7 @@ const rl=readline.createInterface({
 input:process.stdin,
 output:process.stdout
 })
-rl.question(q,(a)=>{
+rl.question(q,a=>{
 rl.close()
 resolve(a)
 })
@@ -30,7 +30,7 @@ function limpiarNumero(numero){
 numero = numero.replace(/[^0-9]/g,'')
 
 if(numero.startsWith('521')){
-numero = '52' + numero.slice(3)
+numero='52'+numero.slice(3)
 }
 
 return numero
@@ -80,8 +80,9 @@ await fetchLatestBaileysVersion()
 
 let usarQR=true
 let numeroGuardado=null
+let codigoPedido=false
 
-const sesionExiste =
+const sesionExiste=
 fs.existsSync('./session/creds.json')
 
 if(!sesionExiste){
@@ -93,7 +94,7 @@ console.log(`╚═════════════════════�
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
 
-const opcion =
+const opcion=
 (await question('Opción (1 o 2): ')).trim()
 
 if(opcion==='1'){
@@ -142,16 +143,16 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(connection==='connecting'){
+if(qr && !usarQR && !sesionExiste && numeroGuardado && !codigoPedido){
 
-if(!sesionExiste && !usarQR && numeroGuardado){
+codigoPedido=true
 
 try{
 
-const pairing =
+const pairing=
 await sock.requestPairingCode(numeroGuardado)
 
-const code =
+const code=
 pairing.match(/.{1,4}/g).join('-')
 
 console.log(`\n╔══════════════════════════════╗`)
@@ -167,8 +168,6 @@ console.log('Error obteniendo código:',e.message)
 
 }
 
-}
-
 if(connection==='open'){
 
 console.log(`\n${global.namebot} conectado\n`)
@@ -177,7 +176,7 @@ console.log(`\n${global.namebot} conectado\n`)
 
 if(connection==='close'){
 
-const reason =
+const reason=
 lastDisconnect?.error?.
 output?.statusCode
 
