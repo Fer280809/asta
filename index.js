@@ -93,7 +93,7 @@ usarQR=false
 
 numero=
 limpiarNumero(
-await ask('Número con país:\n> ')
+await ask('Número con código país:\n> ')
 )
 
 }
@@ -132,17 +132,19 @@ qrcode.generate(qr,{small:true})
 
 }
 
-if(qr
+if(
+connection==='connecting'
 && !usarQR
 && numero
 && !pairingPedido
-&& !state.creds.registered){
+&& !state.creds.registered
+){
 
 pairingPedido=true
 
 try{
 
-await new Promise(r=>setTimeout(r,5000))
+await new Promise(r=>setTimeout(r,7000))
 
 const pairing=
 await sock.requestPairingCode(numero)
@@ -158,7 +160,7 @@ console.log(`════════════════════\n`)
 
 }catch(e){
 
-console.log('Error:',e.message)
+console.log('Error obteniendo código:',e.message)
 
 }
 
@@ -166,7 +168,7 @@ console.log('Error:',e.message)
 
 if(connection==='open'){
 
-console.log(`${global.namebot} conectado`)
+console.log(`\n${global.namebot} conectado\n`)
 
 }
 
@@ -196,12 +198,12 @@ sock.ev.on('creds.update',saveCreds)
 
 sock.ev.on(
 'messages.upsert',
-m=>handler(sock,m)
+async m=>await handler(sock,m)
 )
 
 sock.ev.on(
 'group-participants.update',
-u=>onGroupUpdate(sock,u)
+async u=>await onGroupUpdate(sock,u)
 )
 
 }
