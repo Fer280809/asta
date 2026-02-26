@@ -26,7 +26,14 @@ resolve(a)
 }
 
 function limpiarNumero(numero){
-return numero.replace(/[^0-9]/g,'')
+
+numero = numero.replace(/[^0-9]/g,'')
+
+if(numero.startsWith('521')){
+numero = '52' + numero.slice(3)
+}
+
+return numero
 }
 
 async function verificarPlugins(){
@@ -79,9 +86,9 @@ fs.existsSync('./session/creds.json')
 
 if(!sesionExiste){
 
-console.log(`\n╔════════════════════════════════════╗`)
+console.log(`\n╔══════════════════════════════╗`)
 console.log(`║ ${global.namebot} v${global.vs} ║`)
-console.log(`╚════════════════════════════════════╝\n`)
+console.log(`╚══════════════════════════════╝\n`)
 
 console.log('1. Vinculación por código')
 console.log('2. QR\n')
@@ -124,48 +131,10 @@ printQRInTerminal:false
 
 })
 
-
-
-
-if(!sesionExiste && !usarQR && numeroGuardado){
-
-setTimeout(async()=>{
-
-try{
-
-if(!state.creds.registered){
-
-const pairing =
-await sock.requestPairingCode(numeroGuardado)
-
-const code =
-pairing.match(/.{1,4}/g).join('-')
-
-console.log(`\n╔════════════════════════════════════╗`)
-console.log(`║ CÓDIGO DE VINCULACIÓN              ║`)
-console.log(`║ ${code}                            ║`)
-console.log(`╚════════════════════════════════════╝\n`)
-
-}
-
-}catch(e){
-
-console.log(
-'Error obteniendo código:',
-e.message
-)
-
-}
-
-},2000)
-
-}
-
-
 sock.ev.on('connection.update',
 async({connection,qr,lastDisconnect})=>{
 
-if(qr&&usarQR&&!sesionExiste){
+if(qr && usarQR && !sesionExiste){
 
 console.log('\nEscanea QR:\n')
 
@@ -173,11 +142,36 @@ qrcode.generate(qr,{small:true})
 
 }
 
+if(connection==='connecting'){
+
+if(!sesionExiste && !usarQR && numeroGuardado){
+
+try{
+
+const pairing =
+await sock.requestPairingCode(numeroGuardado)
+
+const code =
+pairing.match(/.{1,4}/g).join('-')
+
+console.log(`\n╔══════════════════════════════╗`)
+console.log(`║ CÓDIGO DE VINCULACIÓN        ║`)
+console.log(`║ ${code}                      ║`)
+console.log(`╚══════════════════════════════╝\n`)
+
+}catch(e){
+
+console.log('Error obteniendo código:',e.message)
+
+}
+
+}
+
+}
+
 if(connection==='open'){
 
-console.log(
-`\n${global.namebot} conectado\n`
-)
+console.log(`\n${global.namebot} conectado\n`)
 
 }
 
