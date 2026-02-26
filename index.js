@@ -27,7 +27,7 @@ rl.question(q,a=>{
 
 rl.close()
 
-r(a)
+r(a.trim())
 
 })
 
@@ -92,7 +92,7 @@ usarQR=false
 
 numero=
 limpiarNumero(
-await ask('Número:\n> ')
+await ask('Número con país:\n> ')
 )
 
 }
@@ -108,19 +108,19 @@ auth:state,
 logger:Pino({level:'silent'}),
 
 browser:[
-global.namebot,
-'Chrome',
-global.vs
+'AstaBot',
+'Edge',
+'20.0.04'
 ],
 
 version,
 
-printQRInTerminal:false
+printQRInTerminal:usarQR
 
 })
 
 sock.ev.on('connection.update',
-({qr})=>{
+({qr,connection,lastDisconnect})=>{
 
 if(qr && usarQR){
 
@@ -129,34 +129,6 @@ console.log('\nEscanea QR:\n')
 qrcode.generate(qr,{small:true})
 
 }
-
-})
-
-if(!usarQR && numero && !state.creds.registered){
-
-await sock.waitForConnectionUpdate(
-
-u=>u.connection==='connecting'
-
-)
-
-await new Promise(r=>setTimeout(r,6000))
-
-const pairing=
-await sock.requestPairingCode(numero)
-
-console.log('\n══════ CÓDIGO ══════')
-
-console.log(
-pairing.match(/.{1,4}/g).join('-')
-)
-
-console.log('════════════════════\n')
-
-}
-
-sock.ev.on('connection.update',
-({connection,lastDisconnect})=>{
 
 if(connection==='open'){
 
@@ -184,16 +156,34 @@ setTimeout(start,4000)
 
 })
 
+if(!usarQR && numero && !state.creds.registered){
+
+await new Promise(r=>setTimeout(r,3000))
+
+const pairing=
+await sock.requestPairingCode(numero)
+
+const code=
+pairing.match(/.{1,4}/g).join('-')
+
+console.log('\n══════ CÓDIGO ══════')
+
+console.log(code)
+
+console.log('════════════════════\n')
+
+}
+
 sock.ev.on('creds.update',saveCreds)
 
 sock.ev.on(
 'messages.upsert',
-m=>handler(sock,m)
+async m=>await handler(sock,m)
 )
 
 sock.ev.on(
 'group-participants.update',
-u=>onGroupUpdate(sock,u)
+async u=>await onGroupUpdate(sock,u)
 )
 
 }
