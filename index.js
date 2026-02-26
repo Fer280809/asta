@@ -4,40 +4,54 @@ useMultiFileAuthState,
 fetchLatestBaileysVersion,
 DisconnectReason
 } from '@whiskeysockets/baileys'
+
 import Pino from 'pino'
 import qrcode from 'qrcode-terminal'
 import readline from 'readline'
-import { handler } from './lib/handler.js'
-import { onGroupUpdate } from './plugins/eventos/group-events.js'
 import fs from 'fs'
 import path from 'path'
 
+import pkg from 'google-libphonenumber'
+const { PhoneNumberUtil } = pkg
+const phoneUtil = PhoneNumberUtil.getInstance()
+
+import { handler } from './lib/handler.js'
+import { onGroupUpdate } from './plugins/eventos/group-events.js'
+
 function ask(q){
-
 return new Promise(r=>{
-
 const rl=readline.createInterface({
-
 input:process.stdin,
 output:process.stdout
-
 })
-
 rl.question(q,a=>{
-
 rl.close()
-
 r(a.trim())
-
 })
-
 })
-
 }
 
 function limpiarNumero(n){
-
 return n.replace(/\D/g,'')
+}
+
+async function numeroValido(numero){
+
+try{
+
+if(!numero.startsWith('+'))
+numero='+'+numero
+
+const parsed=
+phoneUtil.parseAndKeepRawInput(numero)
+
+return phoneUtil.isValidNumber(parsed)
+
+}catch{
+
+return false
+
+}
 
 }
 
@@ -90,10 +104,14 @@ if(op==='1'){
 
 usarQR=false
 
+do{
+
 numero=
 limpiarNumero(
 await ask('Número con país:\n> ')
 )
+
+}while(!(await numeroValido(numero)))
 
 }
 
@@ -115,11 +133,16 @@ browser:[
 
 version,
 
-printQRInTerminal:usarQR
+mobile:false,
+
+printQRInTerminal:usarQR,
+
+markOnlineOnConnect:false
 
 })
 
 sock.ev.on('connection.update',
+
 ({qr,connection,lastDisconnect})=>{
 
 if(qr && usarQR){
@@ -144,6 +167,8 @@ output?.statusCode
 
 if(reason===DisconnectReason.loggedOut){
 
+console.log('Sesión cerrada')
+
 process.exit()
 
 }
@@ -158,17 +183,16 @@ setTimeout(start,4000)
 
 if(!usarQR && numero && !state.creds.registered){
 
-await new Promise(r=>setTimeout(r,3000))
+await new Promise(r=>setTimeout(r,4000))
 
 const pairing=
 await sock.requestPairingCode(numero)
 
-const code=
-pairing.match(/.{1,4}/g).join('-')
-
 console.log('\n══════ CÓDIGO ══════')
 
-console.log(code)
+console.log(
+pairing.match(/.{1,4}/g).join('-')
+)
 
 console.log('════════════════════\n')
 
@@ -178,12 +202,12 @@ sock.ev.on('creds.update',saveCreds)
 
 sock.ev.on(
 'messages.upsert',
-async m=>await handler(sock,m)
+m=>handler(sock,m)
 )
 
 sock.ev.on(
 'group-participants.update',
-async u=>await onGroupUpdate(sock,u)
+u=>onGroupUpdate(sock,u)
 )
 
 }
