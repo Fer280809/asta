@@ -50,8 +50,8 @@ let handler = async (m, { conn }) => {
   }, { quoted: m })
 }
 
-handler.help = ['work', 'trabajar']
+handler.help = ['work', 'trabajar', 'w']
 handler.tags = ['economy']
-handler.command = ['work', 'trabajar']
+handler.command = ['work', 'trabajar', 'w']
 
 export default handler
